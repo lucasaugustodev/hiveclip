@@ -1,12 +1,32 @@
 import { eq } from "drizzle-orm";
 import { vms } from "@hiveclip/db";
 import { VultrClient } from "@hiveclip/vultr";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
 import type { Db } from "./app.js";
+
+// Spawn python with env vars for credentials (avoids shell escaping issues with special chars in passwords)
+function runPython(args: string[], env: Record<string, string>, timeout: number): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("python", args, {
+      env: { ...process.env, ...env },
+      timeout,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
+    child.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+    child.on("close", (code) => {
+      if (code === 0) resolve({ stdout, stderr });
+      else reject(new Error(`Python exited with code ${code}: ${stderr.slice(0, 300)}`));
+    });
+    child.on("error", reject);
+  });
+}
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
