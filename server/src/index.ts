@@ -2,6 +2,7 @@ import "dotenv/config";
 import pino from "pino";
 import { createApp } from "./app.js";
 import { startDb, stopDb } from "./db.js";
+import { setupVncProxy } from "./vnc-proxy.js";
 
 const logger = pino({
   transport: {
