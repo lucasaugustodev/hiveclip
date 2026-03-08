@@ -73,27 +73,33 @@ export function startProvisioningWorker(db: Db) {
     }
 
     const vmIp = instance.main_ip;
-    const vmPass = instance.default_password;
+    // Use password from Vultr API, or fall back to what's stored in DB
+    let vmPass = instance.default_password;
+    if (!vmPass) {
+      const [dbVm] = await db.select().from(vms).where(eq(vms.id, vmId)).limit(1);
+      vmPass = dbVm?.adminPassword || "";
+    }
 
-    // Step 2: Wait a bit for WinRM to be available
+    // Step 2: Wait for WinRM to be available
     await updateVmStatus(vmId, "wait_winrm", 3);
-    console.log(`[Provisioner] Waiting for WinRM on ${vmIp}...`);
+    console.log(`[Provisioner] Waiting for WinRM on ${vmIp} (pass length: ${vmPass.length})...`);
     let winrmReady = false;
-    for (let attempt = 0; attempt < 20; attempt++) {
+    for (let attempt = 0; attempt < 30; attempt++) {
       try {
+        console.log(`[Provisioner] WinRM attempt ${attempt + 1}/30 on ${vmIp}...`);
         const { stdout } = await execFileAsync("python", [
           "-c",
           `import sys,winrm; s=winrm.Session(sys.argv[1],auth=('Administrator',sys.argv[2]),transport='ntlm'); r=s.run_cmd('hostname'); print(r.std_out.decode().strip())`,
           vmIp,
           vmPass,
-        ], { timeout: 30_000 });
+        ], { timeout: 60_000 });
         if (stdout.trim()) {
           console.log(`[Provisioner] WinRM ready on ${vmIp}, hostname: ${stdout.trim()}`);
           winrmReady = true;
           break;
         }
-      } catch {
-        // WinRM not ready yet
+      } catch (err: any) {
+        console.log(`[Provisioner] WinRM attempt ${attempt + 1} failed: ${err.message?.slice(0, 100)}`);
       }
       await sleep(15_000);
     }
