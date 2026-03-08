@@ -6,5 +6,6 @@ dist/
 data/
 .paperclip/
 .hiveclip/
+.pgdata/
 test-results/
 playwright-report/
