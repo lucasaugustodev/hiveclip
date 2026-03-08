@@ -140,22 +140,31 @@ else:
 r = s.run_cmd('netsh advfirewall firewall add rule name=ClaudeLauncher-3001 dir=in action=allow protocol=TCP localport=3001')
 print(f"Firewall port 3001: RC={r.status_code}")
 
-# Create a scheduled task to auto-start claude-launcher-web
-# Run as Administrator so it inherits the user PATH (npm global bin, CLIs, etc.)
-print("Creating auto-start task...")
-task_cmd = (
-    'schtasks /create /tn "ClaudeLauncherWeb" /tr '
-    '"cmd /c cd /d C:\\claude-launcher-web && set PORT=3001 && node server.js" '
-    f'/sc onstart /ru Administrator /rp "{pw}" /rl HIGHEST /f'
-)
-r = s.run_cmd(task_cmd)
-print(f"  Task create RC: {r.status_code}")
-if r.status_code != 0:
-    print(f"  stderr: {r.std_err.decode()[:150]}")
+# Build start.bat with full PATH so SYSTEM user can find all CLIs
+print("Creating launcher start script with full PATH...")
+r = s.run_ps('[Environment]::GetEnvironmentVariable("Path","Machine")')
+sys_path = r.std_out.decode().strip()
+npm_bin = r"C:\Users\Administrator\AppData\Roaming\npm"
+if npm_bin.lower() not in sys_path.lower():
+    sys_path = sys_path.rstrip(";") + ";" + npm_bin
 
-# Start it now
+bat_content = f"@echo off\nset PATH={sys_path};%PATH%\nset PORT=3001\ncd /d C:\\claude-launcher-web\nnode server.js\n"
+escaped_bat = bat_content.replace("'", "''")
+r = s.run_ps(f"Set-Content -Path 'C:\\claude-launcher-web\\start.bat' -Value '{escaped_bat}' -Encoding ASCII")
+print(f"  Write start.bat: RC={r.status_code}")
+
+# Create a scheduled task to auto-start claude-launcher-web
+print("Creating auto-start task...")
+s.run_cmd('schtasks /delete /tn "ClaudeLauncherWeb" /f')
+r = s.run_cmd(
+    'schtasks /create /tn "ClaudeLauncherWeb" /tr '
+    '"cmd /c C:\\claude-launcher-web\\start.bat" '
+    '/sc onstart /ru SYSTEM /rl HIGHEST /f'
+)
+print(f"  Task create RC: {r.status_code}")
+
+# Start it now (kill any existing instance first)
 print("Starting claude-launcher-web...")
-# Kill any existing instance first, then start fresh
 s.run_cmd('taskkill /f /im node.exe 2>nul')
 time.sleep(2)
 r = s.run_cmd(r'schtasks /run /tn "ClaudeLauncherWeb"')
