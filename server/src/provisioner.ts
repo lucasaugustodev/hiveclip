@@ -116,7 +116,7 @@ export function startProvisioningWorker(db: Db) {
     try {
       const { stdout, stderr } = await execFileAsync("python", [
         INSTALL_SCRIPT, vmIp, vmPass,
-      ], { timeout: 180_000 });
+      ], { timeout: 300_000 });
       console.log(`[Provisioner] VNC install output:`, stdout.slice(-200));
       if (stderr && !stderr.includes("CLIXML")) {
         console.warn(`[Provisioner] VNC install stderr:`, stderr.slice(-200));
