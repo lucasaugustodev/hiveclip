@@ -24,9 +24,10 @@ export function createLauncherRouter(): Router {
       return;
     }
 
-    // Verify JWT from Authorization header or cookie
+    // Verify JWT from Authorization header or query param (iframe can't set headers)
     const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const queryToken = req.query.token as string | undefined;
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : queryToken || null;
     if (!token) {
       res.status(401).json({ error: "Unauthorized" });
       return;
@@ -38,10 +39,13 @@ export function createLauncherRouter(): Router {
       return;
     }
 
-    // Strip /api/launcher/:ip from the path
+    // Strip /api/launcher/:ip from the path, remove our token param from query
     const targetPath = req.params[0] || "";
     const targetUrl = `http://${vmIp}:${LAUNCHER_PORT}`;
-    const fullUrl = `${targetUrl}/${targetPath}${req.url?.includes("?") ? "?" + req.url.split("?")[1] : ""}`;
+    const url = new URL(req.url!, `http://${req.headers.host}`);
+    url.searchParams.delete("token");
+    const qs = url.searchParams.toString();
+    const fullUrl = `${targetUrl}/${targetPath}${qs ? "?" + qs : ""}`;
 
     // Proxy the request manually using http module
     const proxyReq = http.request(
