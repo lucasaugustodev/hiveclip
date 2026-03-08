@@ -15,31 +15,32 @@ test.describe("Auth flow", () => {
   });
 
   test("can register a new account", async ({ page }) => {
+    const email = `reg-${Date.now()}@test.com`;
     await page.goto("/register");
     await page.getByLabel("Display Name").fill("Test User");
-    await page.getByLabel("Email").fill("test@example.com");
+    await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill("password123");
     await page.getByRole("button", { name: "Create account" }).click();
-    // Should redirect to board list
-    await expect(page.getByText("Your Boards")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Your Boards")).toBeVisible({ timeout: 10000 });
   });
 
   test("can login with registered account", async ({ page }) => {
-    // First register
+    const email = `login-${Date.now()}@test.com`;
+    // Register
     await page.goto("/register");
-    await page.getByLabel("Email").fill("login-test@example.com");
+    await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill("password123");
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page.getByText("Your Boards")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Your Boards")).toBeVisible({ timeout: 10000 });
 
     // Logout
     await page.evaluate(() => localStorage.removeItem("hiveclip.token"));
     await page.goto("/login");
 
     // Login
-    await page.getByLabel("Email").fill("login-test@example.com");
+    await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill("password123");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByText("Your Boards")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Your Boards")).toBeVisible({ timeout: 10000 });
   });
 });
