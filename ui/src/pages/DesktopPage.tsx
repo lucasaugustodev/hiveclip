@@ -58,16 +58,34 @@ export function DesktopPage() {
         </div>
       </div>
       <div className="flex-1 bg-black flex">
-        {vm?.ipAddress && vm.ipAddress !== "0.0.0.0" ? (
+        {vm?.ipAddress && vm.ipAddress !== "0.0.0.0" && vm.provisioningStep === "ready" ? (
           <VncViewer ip={vm.ipAddress} password="hiveclip123" />
-        ) : vm && (vm.vultrStatus === "pending" || vm.serverStatus !== "ok") ? (
+        ) : vm && vm.provisioningStep && vm.provisioningStep !== "error" ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-3">
               <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-              <p>VM is still booting... ({vm?.vultrStatus || "pending"})</p>
-              <p className="text-xs">This can take 5-10 minutes for Windows</p>
+              <p className="font-medium">
+                {vm.provisioningStep === "wait_boot" && "Waiting for VM to boot..."}
+                {vm.provisioningStep === "wait_winrm" && "Connecting to remote management..."}
+                {vm.provisioningStep === "install_vnc" && "Installing VNC server..."}
+                {vm.provisioningStep === "health_check" && "Verifying VNC connection..."}
+                {!["wait_boot", "wait_winrm", "install_vnc", "health_check", "ready"].includes(vm.provisioningStep) && `Provisioning: ${vm.provisioningStep}`}
+              </p>
+              <div className="w-48 bg-muted rounded-full h-2 mx-auto">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all"
+                  style={{ width: `${((vm.provisioningProgress || 0) / 12) * 100}%` }}
+                />
+              </div>
+              <p className="text-xs">This can take 5-10 minutes for Windows VMs</p>
             </div>
           </div>
+        ) : vm?.provisioningStep === "error" ? (
+          <div className="flex-1 flex items-center justify-center text-destructive">
+            <p>Provisioning failed. Check server logs for details.</p>
+          </div>
+        ) : vm?.ipAddress && vm.ipAddress !== "0.0.0.0" ? (
+          <VncViewer ip={vm.ipAddress} password="hiveclip123" />
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <p>No VM provisioned. Go to the dashboard to provision one first.</p>
