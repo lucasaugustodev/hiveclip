@@ -63,7 +63,7 @@ export function BoardDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!vm || !vm.vultrInstanceId ? (
+            {!vm ? (
               <Button onClick={() => provision.mutate()} disabled={provision.isPending} className="w-full">
                 {provision.isPending ? "Provisioning..." : "Provision VM"}
               </Button>
