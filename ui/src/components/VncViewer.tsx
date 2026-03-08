@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import RFB from "@novnc/novnc/core/rfb.js";
+// @ts-expect-error no types for noVNC
+import RFB from "@novnc/novnc/lib/rfb.js";
 
 interface VncViewerProps {
   ip: string;
