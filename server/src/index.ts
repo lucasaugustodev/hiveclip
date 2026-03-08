@@ -26,7 +26,8 @@ async function main() {
   });
 
   setupVncProxy(server);
-  logger.info("VNC WebSocket proxy ready");
+  setupLauncherWsProxy(server);
+  logger.info("VNC + Launcher WebSocket proxies ready");
 
   async function shutdown() {
     logger.info("Shutting down gracefully...");
