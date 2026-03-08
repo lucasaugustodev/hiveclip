@@ -113,10 +113,23 @@ export function BoardDashboard() {
                   <p className="text-xs font-medium text-green-500 mt-1">VNC ready</p>
                 )}
                 {vm.provisioningStep === "error" && (
-                  <p className="text-xs font-medium text-destructive mt-1">Provisioning error</p>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs font-medium text-destructive">Provisioning error</p>
+                    <Button size="sm" variant="outline" onClick={() => reprovision.mutate()} disabled={reprovision.isPending} className="text-xs h-7">
+                      {reprovision.isPending ? "Retrying..." : "Retry Setup"}
+                    </Button>
+                  </div>
                 )}
-                {!vm.provisioningStep && vm.ipAddress && vm.powerStatus === "running" && (
-                  <p className="text-xs text-muted-foreground mt-1">VM running (provisioned before auto-setup)</p>
+                {!vm.provisioningStep && vm.ipAddress && vm.powerStatus === "running" && !vm.vncHealthy && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-muted-foreground">VNC not installed yet</p>
+                    <Button size="sm" variant="outline" onClick={() => reprovision.mutate()} disabled={reprovision.isPending} className="text-xs h-7">
+                      {reprovision.isPending ? "Installing..." : "Install VNC"}
+                    </Button>
+                  </div>
+                )}
+                {!vm.provisioningStep && vm.ipAddress && vm.powerStatus === "running" && vm.vncHealthy && (
+                  <p className="text-xs font-medium text-green-500 mt-1">VNC ready</p>
                 )}
               </div>
             )}
