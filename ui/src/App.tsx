@@ -29,6 +29,7 @@ function AppRoutes() {
         <Route index element={<BoardListPage />} />
         <Route path="boards/:boardId" element={<BoardDashboard />} />
         <Route path="boards/:boardId/desktop" element={<DesktopPage />} />
+        <Route path="boards/:boardId/launcher" element={<LauncherPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
