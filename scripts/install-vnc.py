@@ -1,9 +1,11 @@
 import winrm
 import sys
+import os
 import time
 
-ip = sys.argv[1] if len(sys.argv) > 1 else "216.238.104.3"
-pw = sys.argv[2] if len(sys.argv) > 2 else "9gL=eh]Scc@jSeW2"
+# Read credentials from args or env vars (env vars avoid shell escaping issues)
+ip = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("VM_IP", "216.238.104.3")
+pw = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("VM_PASS", "9gL=eh]Scc@jSeW2")
 
 # GitHub mirror for TightVNC MSI (tightvnc.com is blocked from some Vultr regions)
 GITHUB_URL = "https://github.com/lucasaugustodev/hiveclip/releases/download/vnc-installer/tightvnc.msi"
