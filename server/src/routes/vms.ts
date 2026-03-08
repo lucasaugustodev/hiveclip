@@ -151,6 +151,25 @@ export function createVmsRouter(db: Db, provisioner: Provisioner) {
     res.json({ message: "Re-provisioning started", vmId: vm.id });
   });
 
+  // Dev-only: mark VM as VNC-ready (for VMs where VNC was installed manually)
+  router.post("/boards/:boardId/vm/mark-ready", requireAuth, async (req, res) => {
+    const [vm] = await db.select().from(vms).where(eq(vms.boardId, req.params.boardId as string)).limit(1);
+    if (!vm) {
+      res.status(404).json({ error: "No VM for this board" });
+      return;
+    }
+    await db.update(vms).set({
+      provisioningStep: "ready",
+      provisioningProgress: 12,
+      vncHealthy: true,
+      vncPort: 5900,
+      updatedAt: new Date(),
+    }).where(eq(vms.id, vm.id));
+    const { boards } = await import("@hiveclip/db");
+    await db.update(boards).set({ status: "running", updatedAt: new Date() }).where(eq(boards.id, req.params.boardId as string));
+    res.json({ message: "VM marked as ready" });
+  });
+
   // Dev-only: link an existing Vultr VM to a board
   router.post("/boards/:boardId/vm/link", requireAuth, async (req, res) => {
     const { boardId } = req.params;
