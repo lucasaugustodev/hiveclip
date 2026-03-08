@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
-import { apiClient } from "../api/client";
+import { api } from "../api/client";
+
+const TOKEN_KEY = "hiveclip.token";
 
 interface User {
   id: string;
@@ -26,7 +28,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
-    token: localStorage.getItem("token"),
+    token: localStorage.getItem(TOKEN_KEY),
     isLoading: true,
   });
 
@@ -35,34 +37,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState((s) => ({ ...s, isLoading: false }));
       return;
     }
-    apiClient("/api/auth/me")
+    api.get<User>("/auth/me")
       .then((user) => setState({ user, token: state.token, isLoading: false }))
       .catch(() => {
-        localStorage.removeItem("token");
+        localStorage.removeItem(TOKEN_KEY);
         setState({ user: null, token: null, isLoading: false });
       });
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await apiClient("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
-    localStorage.setItem("token", res.token);
+    const res = await api.post<{ token: string; user: User }>("/auth/login", { email, password });
+    localStorage.setItem(TOKEN_KEY, res.token);
     setState({ user: res.user, token: res.token, isLoading: false });
   }, []);
 
   const register = useCallback(async (email: string, password: string, displayName?: string) => {
-    const res = await apiClient("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password, displayName }),
-    });
-    localStorage.setItem("token", res.token);
+    const res = await api.post<{ token: string; user: User }>("/auth/register", { email, password, displayName });
+    localStorage.setItem(TOKEN_KEY, res.token);
     setState({ user: res.user, token: res.token, isLoading: false });
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("token");
+    localStorage.removeItem(TOKEN_KEY);
     setState({ user: null, token: null, isLoading: false });
   }, []);
 
