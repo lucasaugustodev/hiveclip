@@ -164,39 +164,63 @@ print(f"Port 3001 listening: {port_ok}")
 # ========== STEP 3: Install Dev CLIs ==========
 print("\n=== Step 3: Dev CLIs ===")
 
-# Refresh PATH so newly installed Node/Git/npm are available
+# First, persist npm global bin + common tool paths into system PATH
+NPM_GLOBAL = r"C:\Users\Administrator\AppData\Roaming\npm"
+EXTRA_PATHS = [
+    r"C:\Program Files\nodejs",
+    r"C:\Program Files\Git\cmd",
+    r"C:\Program Files\GitHub CLI",
+    NPM_GLOBAL,
+]
+
+print("Updating system PATH...")
 r = s.run_ps('[Environment]::GetEnvironmentVariable("Path","Machine")')
 machine_path = r.std_out.decode().strip()
+
+paths_to_add = [p for p in EXTRA_PATHS if p.lower() not in machine_path.lower()]
+if paths_to_add:
+    new_path = machine_path.rstrip(";") + ";" + ";".join(paths_to_add)
+    # Persist to system PATH so it survives reboots
+    escaped = new_path.replace("'", "''")
+    r = s.run_ps(f"[Environment]::SetEnvironmentVariable('Path', '{escaped}', 'Machine')")
+    print(f"  Added to PATH: {', '.join(paths_to_add)}")
+else:
+    new_path = machine_path
+    print("  PATH already configured")
+
+# Build full PATH for current session
 r = s.run_ps('[Environment]::GetEnvironmentVariable("Path","User")')
 user_path = r.std_out.decode().strip()
-full_path = machine_path + ";" + user_path
-# Common paths that might not be in PATH yet
-extra = r"C:\Program Files\nodejs;C:\Program Files\Git\cmd;C:\Program Files\GitHub CLI"
-full_path = extra + ";" + full_path
+full_path = new_path + ";" + user_path
 
-def run_with_path(cmd, label="", timeout_sec=120):
-    """Run a cmd with refreshed PATH"""
+def run_cmd(cmd, label=""):
+    """Run cmd with full PATH"""
     wrapped = f'cmd /c "set PATH={full_path} && {cmd}"'
     r = s.run_cmd(wrapped)
     out = r.std_out.decode().strip()
     err = r.std_err.decode().strip()
     if label:
-        if r.status_code == 0:
-            print(f"  {label}: OK - {out[:100]}")
-        else:
-            print(f"  {label}: RC={r.status_code} - {(err or out)[:150]}")
+        status = "OK" if r.status_code == 0 else f"RC={r.status_code}"
+        detail = out[:120] if r.status_code == 0 else (err or out)[:150]
+        print(f"  {label}: {status} - {detail}")
     return r
 
-# --- Claude Code CLI ---
-print("Installing Claude Code CLI...")
-r = run_with_path('npm list -g @anthropic-ai/claude-code', "Check claude")
-if r.status_code != 0:
-    run_with_path('npm install -g @anthropic-ai/claude-code', "npm install claude-code")
-run_with_path('claude --version', "Claude Code")
+def install_npm_global(pkg, cmd_name, label):
+    """Install npm global package if not present"""
+    print(f"Installing {label}...")
+    r = run_cmd(f'cmd /c "set PATH={full_path} && {cmd_name} --version"', f"Check {cmd_name}")
+    if r.status_code != 0:
+        run_cmd(f'npm install -g {pkg}', f"npm install {pkg}")
+        run_cmd(f'{cmd_name} --version', label)
+    else:
+        print(f"  {label} already installed")
 
-# --- GitHub CLI ---
+# --- Claude Code CLI ---
+install_npm_global('@anthropic-ai/claude-code', 'claude', 'Claude Code CLI')
+
+# --- GitHub CLI (MSI installer, not npm) ---
 print("Installing GitHub CLI...")
-r = run_with_path('gh --version', "Check gh")
+r = run_cmd('gh --version', "Check gh")
 if r.status_code != 0:
     print("  Downloading GitHub CLI...")
     r = s.run_cmd(
@@ -208,32 +232,24 @@ if r.status_code != 0:
         r2 = s.run_cmd(r'msiexec /i C:\Users\Administrator\gh-setup.msi /quiet /norestart')
         print(f"  GitHub CLI install RC: {r2.status_code}")
         time.sleep(3)
-        run_with_path('gh --version', "GitHub CLI")
+        run_cmd('gh --version', "GitHub CLI")
     else:
         print("  WARNING: GitHub CLI download failed")
-else:
-    print(f"  GitHub CLI already installed")
 
 # --- Gemini CLI ---
-print("Installing Gemini CLI...")
-r = run_with_path('npm list -g @anthropic-ai/claude-code', "Check gemini")
-# Gemini CLI is @anthropic-ai/claude-code... actually it's @anthropic-ai/gemini-cli or similar
-# Let's use the google one: npm install -g @anthropic-ai/claude-code
-r = run_with_path('npm list -g @google/gemini-cli', "Check gemini-cli")
-if r.status_code != 0:
-    run_with_path('npm install -g @google/gemini-cli', "npm install gemini-cli")
-run_with_path('gemini --version', "Gemini CLI")
+install_npm_global('@anthropic-ai/gemini-cli', 'gemini', 'Gemini CLI')
 
 # --- Cline CLI ---
-print("Installing Cline CLI...")
-r = run_with_path('npm list -g cline', "Check cline")
-if r.status_code != 0:
-    run_with_path('npm install -g cline', "npm install cline")
-run_with_path('cline --version', "Cline CLI")
+install_npm_global('cline', 'cline', 'Cline CLI')
 
-# --- Python (already available on Windows Server) ---
-print("Checking Python...")
-run_with_path('python --version', "Python")
+# --- Verify all ---
+print("\nVerifying installations...")
+run_cmd('node --version', "Node.js")
+run_cmd('git --version', "Git")
+run_cmd('claude --version', "Claude Code")
+run_cmd('gh --version', "GitHub CLI")
+run_cmd('gemini --version', "Gemini CLI")
+run_cmd('cline --version', "Cline CLI")
 
 print("\n=== Provisioning complete ===")
 print(f"  VNC: {ip}:5900 (password: hiveclip123)")
