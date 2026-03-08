@@ -1,0 +1,156 @@
+import type { Request, Response, Router } from "express";
+import { Router as createRouter } from "express";
+import { createProxyMiddleware } from "http-proxy-middleware";
+import type { Server as HttpServer } from "node:http";
+import http from "node:http";
+import { WebSocketServer, WebSocket } from "ws";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET || "hiveclip-dev-secret";
+const LAUNCHER_PORT = 3001;
+
+/**
+ * HTTP reverse proxy: /api/launcher/:ip/* -> http://<ip>:3001/*
+ * Allows the HiveClip UI to embed claude-launcher-web via iframe
+ * without CORS issues or exposing VM IPs directly.
+ */
+export function createLauncherRouter(): Router {
+  const router = createRouter();
+
+  router.all("/:ip/*", (req: Request, res: Response) => {
+    const vmIp = req.params.ip as string;
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(vmIp)) {
+      res.status(400).json({ error: "Invalid IP" });
+      return;
+    }
+
+    // Verify JWT from Authorization header or cookie
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    try {
+      jwt.verify(token, JWT_SECRET);
+    } catch {
+      res.status(401).json({ error: "Invalid token" });
+      return;
+    }
+
+    // Strip /api/launcher/:ip from the path
+    const targetPath = req.params[0] || "";
+    const targetUrl = `http://${vmIp}:${LAUNCHER_PORT}`;
+    const fullUrl = `${targetUrl}/${targetPath}${req.url?.includes("?") ? "?" + req.url.split("?")[1] : ""}`;
+
+    // Proxy the request manually using http module
+    const proxyReq = http.request(
+      fullUrl,
+      {
+        method: req.method,
+        headers: {
+          ...req.headers,
+          host: `${vmIp}:${LAUNCHER_PORT}`,
+        },
+        timeout: 30_000,
+      },
+      (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+        proxyRes.pipe(res);
+      },
+    );
+
+    proxyReq.on("error", (err) => {
+      console.error(`[Launcher Proxy] HTTP error for ${vmIp}:`, err.message);
+      if (!res.headersSent) {
+        res.status(502).json({ error: `Launcher unreachable: ${err.message}` });
+      }
+    });
+
+    req.pipe(proxyReq);
+  });
+
+  return router;
+}
+
+/**
+ * WebSocket proxy for the launcher's terminal:
+ * ws://host/api/launcher-ws/:ip?token=...  ->  ws://<ip>:3001
+ */
+export function setupLauncherWsProxy(server: HttpServer) {
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Attach to the existing server upgrade event
+  const existingListeners = server.listeners("upgrade").slice();
+
+  server.removeAllListeners("upgrade");
+  server.on("upgrade", (req, socket, head) => {
+    const match = req.url?.match(/^\/api\/launcher-ws\/(\d+\.\d+\.\d+\.\d+)/);
+    if (!match) {
+      // Not for us — delegate to other upgrade handlers (VNC proxy)
+      for (const listener of existingListeners) {
+        (listener as Function).call(server, req, socket, head);
+      }
+      return;
+    }
+
+    // Verify JWT
+    const url = new URL(req.url!, `http://${req.headers.host}`);
+    const token = url.searchParams.get("token");
+    if (!token) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    try {
+      jwt.verify(token, JWT_SECRET);
+    } catch {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+
+    const vmIp = match[1];
+
+    wss.handleUpgrade(req, socket, head, (clientWs) => {
+      // Connect to the launcher on the VM
+      const vmWs = new WebSocket(`ws://${vmIp}:${LAUNCHER_PORT}${req.url?.replace(/^\/api\/launcher-ws\/\d+\.\d+\.\d+\.\d+/, "") || ""}`);
+
+      vmWs.on("open", () => {
+        console.log(`[Launcher WS] Connected to ${vmIp}:${LAUNCHER_PORT}`);
+      });
+
+      vmWs.on("message", (data) => {
+        if (clientWs.readyState === WebSocket.OPEN) {
+          clientWs.send(data);
+        }
+      });
+
+      clientWs.on("message", (data) => {
+        if (vmWs.readyState === WebSocket.OPEN) {
+          vmWs.send(data);
+        }
+      });
+
+      vmWs.on("error", (err) => {
+        console.error(`[Launcher WS] VM error:`, err.message);
+        clientWs.close(1011, "Launcher connection error");
+      });
+
+      vmWs.on("close", () => {
+        clientWs.close();
+      });
+
+      clientWs.on("close", () => {
+        vmWs.close();
+      });
+
+      clientWs.on("error", (err) => {
+        console.error(`[Launcher WS] Client error:`, err.message);
+        vmWs.close();
+      });
+    });
+  });
+
+  return wss;
+}
