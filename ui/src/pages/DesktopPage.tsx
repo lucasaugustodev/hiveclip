@@ -39,7 +39,7 @@ export function DesktopPage() {
         {vm?.status === "running" ? (
           <div className="text-center space-y-2">
             <p className="text-lg">noVNC Viewer</p>
-            <p className="text-sm">WebSocket connection to {vm.mainIp || "VM"}:5900</p>
+            <p className="text-sm">WebSocket connection to {vm.ipAddress || "VM"}:5900</p>
             <p className="text-xs">(VNC integration will be connected here)</p>
           </div>
         ) : (
