@@ -10,13 +10,11 @@ const LAUNCHER_PORT = 3001;
 
 /**
  * HTTP reverse proxy: /api/launcher/:ip/* -> http://<ip>:3001/*
- * Allows the HiveClip UI to embed claude-launcher-web via iframe
- * without CORS issues or exposing VM IPs directly.
  */
 export function createLauncherRouter(): Router {
   const router = createRouter();
 
-  router.all("/:ip/:path(*)", (req: Request, res: Response) => {
+  function proxyHandler(req: Request, res: Response) {
     const vmIp = req.params.ip as string;
     if (!/^\d+\.\d+\.\d+\.\d+$/.test(vmIp)) {
       res.status(400).json({ error: "Invalid IP" });
@@ -38,23 +36,18 @@ export function createLauncherRouter(): Router {
       return;
     }
 
-    // Strip /api/launcher/:ip from the path, remove our token param from query
-    const targetPath = (req.params as any).path || "";
-    const targetUrl = `http://${vmIp}:${LAUNCHER_PORT}`;
+    // Build target URL
+    const subPath = (req.params as Record<string, string>).path || "";
     const url = new URL(req.url!, `http://${req.headers.host}`);
     url.searchParams.delete("token");
     const qs = url.searchParams.toString();
-    const fullUrl = `${targetUrl}/${targetPath}${qs ? "?" + qs : ""}`;
+    const fullUrl = `http://${vmIp}:${LAUNCHER_PORT}/${subPath}${qs ? "?" + qs : ""}`;
 
-    // Proxy the request manually using http module
     const proxyReq = http.request(
       fullUrl,
       {
         method: req.method,
-        headers: {
-          ...req.headers,
-          host: `${vmIp}:${LAUNCHER_PORT}`,
-        },
+        headers: { ...req.headers, host: `${vmIp}:${LAUNCHER_PORT}` },
         timeout: 30_000,
       },
       (proxyRes) => {
@@ -71,7 +64,11 @@ export function createLauncherRouter(): Router {
     });
 
     req.pipe(proxyReq);
-  });
+  }
+
+  // Handle both root and subpaths
+  router.all("/:ip", proxyHandler);
+  router.all("/:ip/:path(.*)", proxyHandler);
 
   return router;
 }
@@ -83,21 +80,18 @@ export function createLauncherRouter(): Router {
 export function setupLauncherWsProxy(server: HttpServer) {
   const wss = new WebSocketServer({ noServer: true });
 
-  // Attach to the existing server upgrade event
   const existingListeners = server.listeners("upgrade").slice();
-
   server.removeAllListeners("upgrade");
+
   server.on("upgrade", (req, socket, head) => {
     const match = req.url?.match(/^\/api\/launcher-ws\/(\d+\.\d+\.\d+\.\d+)/);
     if (!match) {
-      // Not for us — delegate to other upgrade handlers (VNC proxy)
       for (const listener of existingListeners) {
         (listener as Function).call(server, req, socket, head);
       }
       return;
     }
 
-    // Verify JWT
     const url = new URL(req.url!, `http://${req.headers.host}`);
     const token = url.searchParams.get("token");
     if (!token) {
@@ -116,23 +110,19 @@ export function setupLauncherWsProxy(server: HttpServer) {
     const vmIp = match[1];
 
     wss.handleUpgrade(req, socket, head, (clientWs) => {
-      // Connect to the launcher on the VM
-      const vmWs = new WebSocket(`ws://${vmIp}:${LAUNCHER_PORT}${req.url?.replace(/^\/api\/launcher-ws\/\d+\.\d+\.\d+\.\d+/, "") || ""}`);
+      const vmWsUrl = `ws://${vmIp}:${LAUNCHER_PORT}${req.url?.replace(/^\/api\/launcher-ws\/\d+\.\d+\.\d+\.\d+/, "") || ""}`;
+      const vmWs = new WebSocket(vmWsUrl);
 
       vmWs.on("open", () => {
         console.log(`[Launcher WS] Connected to ${vmIp}:${LAUNCHER_PORT}`);
       });
 
       vmWs.on("message", (data) => {
-        if (clientWs.readyState === WebSocket.OPEN) {
-          clientWs.send(data);
-        }
+        if (clientWs.readyState === WebSocket.OPEN) clientWs.send(data);
       });
 
       clientWs.on("message", (data) => {
-        if (vmWs.readyState === WebSocket.OPEN) {
-          vmWs.send(data);
-        }
+        if (vmWs.readyState === WebSocket.OPEN) vmWs.send(data);
       });
 
       vmWs.on("error", (err) => {
@@ -140,18 +130,9 @@ export function setupLauncherWsProxy(server: HttpServer) {
         clientWs.close(1011, "Launcher connection error");
       });
 
-      vmWs.on("close", () => {
-        clientWs.close();
-      });
-
-      clientWs.on("close", () => {
-        vmWs.close();
-      });
-
-      clientWs.on("error", (err) => {
-        console.error(`[Launcher WS] Client error:`, err.message);
-        vmWs.close();
-      });
+      vmWs.on("close", () => clientWs.close());
+      clientWs.on("close", () => vmWs.close());
+      clientWs.on("error", () => vmWs.close());
     });
   });
 
