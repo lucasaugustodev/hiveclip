@@ -10,6 +10,7 @@ const VULTR_API_KEY = process.env.VULTR_API_KEY || "";
 const WINDOWS_OS_ID = 501; // Windows 2022 Standard x64
 const DEFAULT_REGION = "sao"; // São Paulo
 const WINDOWS_PLAN = "vc2-2c-4gb"; // 2 vCPUs, 4GB RAM, $20/mo
+const STARTUP_SCRIPT_ID = "d2f602f1-11fa-4cf2-bc4f-e90998926898"; // Installs TightVNC + WinRM
 
 const vultr = new VultrClient(VULTR_API_KEY);
 
