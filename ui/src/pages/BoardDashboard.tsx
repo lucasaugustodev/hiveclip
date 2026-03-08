@@ -21,6 +21,7 @@ export function BoardDashboard() {
     queryKey: ["vm", boardId],
     queryFn: () => fetchVm(boardId!),
     enabled: !!boardId,
+    refetchInterval: 5000,
   });
 
   const provision = useMutation({
