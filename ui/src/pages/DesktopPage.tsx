@@ -59,8 +59,8 @@ export function DesktopPage() {
       </div>
       <div className="flex-1 bg-black flex">
         {vm?.ipAddress && vm.ipAddress !== "0.0.0.0" ? (
-          <VncViewer ip={vm.ipAddress} password={vm.adminPassword || undefined} />
-        ) : vm?.vultrStatus === "pending" || vm?.serverStatus !== "ok" ? (
+          <VncViewer ip={vm.ipAddress} password="hiveclip123" />
+        ) : vm && (vm.vultrStatus === "pending" || vm.serverStatus !== "ok") ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center space-y-2">
               <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
