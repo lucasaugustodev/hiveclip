@@ -7,7 +7,7 @@ export const vmsRouter = Router();
 
 const VULTR_API_KEY = process.env.VULTR_API_KEY || "";
 const WINDOWS_OS_ID = 501; // Windows 2022 Standard x64
-const DEFAULT_REGION = "mia"; // Miami - closest to Brazil
+const DEFAULT_REGION = "sao"; // São Paulo
 
 const vultr = new VultrClient(VULTR_API_KEY);
 
