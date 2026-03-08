@@ -97,7 +97,15 @@ export function createLauncherRouter(): Router {
       }
     });
 
-    req.pipe(proxyReq);
+    // If express.json() already parsed the body, we need to re-serialize it
+    // because the original stream was consumed
+    if (req.body && typeof req.body === "object" && Object.keys(req.body).length > 0) {
+      const bodyStr = JSON.stringify(req.body);
+      proxyReq.setHeader("content-length", Buffer.byteLength(bodyStr));
+      proxyReq.end(bodyStr);
+    } else {
+      req.pipe(proxyReq);
+    }
   }
 
   // Handle both root and subpaths
