@@ -81,7 +81,7 @@ export function BoardDashboard() {
               <div className="text-xs text-muted-foreground space-y-1">
                 <p>Region: {vm.region}</p>
                 <p>Plan: {vm.plan}</p>
-                <p>IP: {vm.mainIp || "Pending..."}</p>
+                <p>IP: {vm.ipAddress || "Pending..."}</p>
               </div>
             )}
           </CardContent>
