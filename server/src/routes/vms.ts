@@ -50,17 +50,12 @@ vmsRouter.post("/boards/:boardId/vm/provision", requireAuth, async (req, res) =>
   }
 
   try {
-    // Find best plan for Windows
-    const plan = await vultr.getBestWindowsPlan(DEFAULT_REGION);
-    if (!plan) {
-      res.status(500).json({ error: "No suitable plan found" });
-      return;
-    }
+    const WINDOWS_PLAN = "vc2-2c-4gb"; // 2 vCPUs, 4GB RAM, $20/mo - minimum for Windows
 
     const instance = await vultr.createInstance({
       label: `hiveclip-${boardId.slice(0, 8)}`,
       region: DEFAULT_REGION,
-      plan: plan.id,
+      plan: WINDOWS_PLAN,
       os_id: WINDOWS_OS_ID,
       hostname: `hc-${boardId.slice(0, 8)}`,
     });
@@ -70,11 +65,8 @@ vmsRouter.post("/boards/:boardId/vm/provision", requireAuth, async (req, res) =>
     res.status(202).json({
       message: "VM provisioning started",
       instanceId: instance.id,
-      plan: plan.id,
+      plan: WINDOWS_PLAN,
       region: DEFAULT_REGION,
-      monthlyCost: plan.monthly_cost,
-      ram: plan.ram,
-      vcpus: plan.vcpu_count,
     });
   } catch (err: any) {
     res.status(502).json({ error: `Provisioning failed: ${err.message}` });
