@@ -128,19 +128,19 @@ export function startProvisioningWorker(db: Db) {
       return;
     }
 
-    // Step 3: Install TightVNC
-    await updateVmStatus(vmId, "install_vnc", 6);
-    console.log(`[Provisioner] Installing TightVNC on ${vmIp}...`);
+    // Step 3: Install VNC + Launcher + CLIs (all in one Python script)
+    await updateVmStatus(vmId, "install_software", 6);
+    console.log(`[Provisioner] Installing software on ${vmIp} (VNC, Launcher, CLIs)...`);
     try {
       const { stdout, stderr } = await runPython([
         INSTALL_SCRIPT,
-      ], { VM_IP: vmIp, VM_PASS: vmPass }, 300_000);
-      console.log(`[Provisioner] VNC install output:`, stdout.slice(-200));
+      ], { VM_IP: vmIp, VM_PASS: vmPass }, 600_000); // 10 min timeout for full install
+      console.log(`[Provisioner] Install output:`, stdout.slice(-500));
       if (stderr && !stderr.includes("CLIXML")) {
-        console.warn(`[Provisioner] VNC install stderr:`, stderr.slice(-200));
+        console.warn(`[Provisioner] Install stderr:`, stderr.slice(-300));
       }
     } catch (err: any) {
-      console.error(`[Provisioner] VNC install failed:`, err.message);
+      console.error(`[Provisioner] Software install failed:`, err.message);
       await updateVmStatus(vmId, "error", 6);
       return;
     }
