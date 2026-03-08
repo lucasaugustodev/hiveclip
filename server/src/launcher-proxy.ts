@@ -158,7 +158,9 @@ export function setupLauncherWsProxy(server: HttpServer) {
       if (expiry && expiry > Date.now()) authenticated = true;
     }
 
+    console.log(`[Launcher WS] Auth: token=${!!token ? 'jwt' : 'none'}, session=${!!sessionId}, authenticated=${authenticated}`);
     if (!authenticated) {
+      console.log(`[Launcher WS] 401 Unauthorized - rejecting`);
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
       return;
@@ -174,18 +176,19 @@ export function setupLauncherWsProxy(server: HttpServer) {
         : /^\/api\/launcher\/\d+\.\d+\.\d+\.\d+/;
       const vmWsPath = req.url?.replace(stripPattern, "") || "";
       const vmWsUrl = `ws://${vmIp}:${LAUNCHER_PORT}${vmWsPath}`;
+      console.log(`[Launcher WS] Connecting to VM: ${vmWsUrl}`);
       const vmWs = new WebSocket(vmWsUrl);
 
       vmWs.on("open", () => {
         console.log(`[Launcher WS] Connected to ${vmIp}:${LAUNCHER_PORT}`);
       });
 
-      vmWs.on("message", (data) => {
-        if (clientWs.readyState === WebSocket.OPEN) clientWs.send(data);
+      vmWs.on("message", (data, isBinary) => {
+        if (clientWs.readyState === WebSocket.OPEN) clientWs.send(data, { binary: isBinary });
       });
 
-      clientWs.on("message", (data) => {
-        if (vmWs.readyState === WebSocket.OPEN) vmWs.send(data);
+      clientWs.on("message", (data, isBinary) => {
+        if (vmWs.readyState === WebSocket.OPEN) vmWs.send(data, { binary: isBinary });
       });
 
       vmWs.on("error", (err) => {
