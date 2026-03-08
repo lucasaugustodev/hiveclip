@@ -83,6 +83,26 @@ export function BoardDashboard() {
                 <p>Region: {vm.region}</p>
                 <p>Plan: {vm.plan}</p>
                 <p>IP: {vm.ipAddress || "Pending..."}</p>
+                {vm.provisioningStep && vm.provisioningStep !== "ready" && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs font-medium text-primary">
+                      {vm.provisioningStep === "wait_boot" && "Waiting for VM to boot..."}
+                      {vm.provisioningStep === "wait_winrm" && "Waiting for remote management..."}
+                      {vm.provisioningStep === "install_vnc" && "Installing VNC server..."}
+                      {vm.provisioningStep === "health_check" && "Verifying VNC connection..."}
+                      {vm.provisioningStep === "error" && "Provisioning error"}
+                    </p>
+                    <div className="w-full bg-muted rounded-full h-1.5">
+                      <div
+                        className="bg-primary h-1.5 rounded-full transition-all"
+                        style={{ width: `${((vm.provisioningProgress || 0) / 12) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {vm.provisioningStep === "ready" && (
+                  <p className="text-xs font-medium text-green-500 mt-1">VNC ready</p>
+                )}
               </div>
             )}
           </CardContent>
