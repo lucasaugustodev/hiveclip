@@ -69,10 +69,10 @@ export function BoardDashboard() {
               </Button>
             ) : (
               <div className="flex gap-2">
-                <Button onClick={() => start.mutate()} disabled={start.isPending || vm.status === "running"} variant="outline" className="flex-1">
+                <Button onClick={() => start.mutate()} disabled={start.isPending || vm.powerStatus === "running"} variant="outline" className="flex-1">
                   <Play className="mr-2 h-4 w-4" />Start
                 </Button>
-                <Button onClick={() => stop.mutate()} disabled={stop.isPending || vm.status === "stopped"} variant="outline" className="flex-1">
+                <Button onClick={() => stop.mutate()} disabled={stop.isPending || vm.powerStatus === "stopped"} variant="outline" className="flex-1">
                   <Square className="mr-2 h-4 w-4" />Stop
                 </Button>
               </div>
