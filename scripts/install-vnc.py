@@ -5,6 +5,10 @@ import time
 ip = sys.argv[1] if len(sys.argv) > 1 else "216.238.104.3"
 pw = sys.argv[2] if len(sys.argv) > 2 else "9gL=eh]Scc@jSeW2"
 
+# GitHub mirror for TightVNC MSI (tightvnc.com is blocked from some Vultr regions)
+GITHUB_URL = "https://github.com/lucasaugustodev/hiveclip/releases/download/vnc-installer/tightvnc.msi"
+TIGHTVNC_URL = "https://www.tightvnc.com/download/2.8.84/tightvnc-2.8.84-gpl-setup-64bit.msi"
+
 print(f"Connecting to {ip}...")
 s = winrm.Session(ip, auth=("Administrator", pw), transport="ntlm")
 
@@ -19,61 +23,52 @@ if "Running" in status:
     print("TightVNC already running!")
     sys.exit(0)
 
-# Step 1: Download MSI using curl.exe (cmd, not PowerShell - more reliable)
-# Primary: GitHub mirror (tightvnc.com is blocked from some Vultr regions)
-GITHUB_URL = "https://github.com/lucasaugustodev/hiveclip/releases/download/vnc-installer/tightvnc.msi"
-TIGHTVNC_URL = "https://www.tightvnc.com/download/2.8.84/tightvnc-2.8.84-gpl-setup-64bit.msi"
-MSI_PATH = r"C:\Users\Administrator\vnc.msi"
-
-print("Downloading TightVNC MSI...")
+# Download MSI via curl.exe (cmd) - try GitHub first, then tightvnc.com
+msi_path = r"C:\Users\Administrator\vnc.msi"
+downloaded = False
 for url in [GITHUB_URL, TIGHTVNC_URL]:
-    print(f"  Trying {url[:60]}...")
-    r = s.run_cmd(f'curl.exe -L -o "{MSI_PATH}" "{url}" --connect-timeout 15 --max-time 180')
+    print(f"Downloading from {url[:60]}...")
+    r = s.run_cmd(f'curl.exe -L -o "{msi_path}" "{url}" --connect-timeout 15 --max-time 180')
     if r.status_code == 0:
-        # Verify file size (MSI should be ~2.5MB)
-        r2 = s.run_cmd(f'powershell -c "(Get-Item \'{MSI_PATH}\').Length"')
+        r2 = s.run_cmd(f'powershell -c "(Get-Item \'{msi_path}\').Length"')
         size = int(r2.std_out.decode().strip() or "0")
         if size > 1000000:
             print(f"  Downloaded OK ({size} bytes)")
+            downloaded = True
             break
-        else:
-            print(f"  File too small ({size} bytes), trying next URL...")
+        print(f"  File too small ({size} bytes)")
     else:
         print(f"  Failed (RC={r.status_code})")
-else:
-    print("ERROR: Could not download TightVNC MSI from any source")
+
+if not downloaded:
+    print("ERROR: Could not download TightVNC MSI")
     sys.exit(1)
 
-# Step 2: Install MSI
+# Install
 print("Installing TightVNC...")
 r = s.run_cmd(
-    f'msiexec /i "{MSI_PATH}" /quiet /norestart '
+    f'msiexec /i "{msi_path}" /quiet /norestart '
     'ADDLOCAL=Server SET_USEVNCAUTHENTICATION=1 VALUE_OF_USEVNCAUTHENTICATION=1 '
     'SET_PASSWORD=1 VALUE_OF_PASSWORD=hiveclip123 '
     'SET_USECONTROLAUTHENTICATION=1 VALUE_OF_USECONTROLAUTHENTICATION=1 '
     'SET_CONTROLPASSWORD=1 VALUE_OF_CONTROLPASSWORD=hiveclip123'
 )
 print(f"  Install RC: {r.status_code}")
-if r.status_code != 0:
-    print(f"  Error: {r.std_err.decode()[:200] if r.std_err else 'unknown'}")
-    sys.exit(1)
 
-# Step 3: Firewall rule
-print("Adding firewall rule...")
+# Firewall
 r = s.run_cmd('netsh advfirewall firewall add rule name=VNC-5900 dir=in action=allow protocol=TCP localport=5900')
 print(f"  Firewall RC: {r.status_code}")
 
-# Step 4: Start service
+# Start service
 time.sleep(5)
-print("Starting VNC service...")
 r = s.run_cmd('net start tvnserver')
 print(f"  Start RC: {r.status_code}")
 
-# Final check
+# Verify
 r = s.run_cmd('sc query tvnserver')
 output = r.std_out.decode()
 if "RUNNING" in output:
     print("TightVNC is RUNNING!")
 else:
-    print(f"Service status: {output[:200]}")
+    print(f"Service not running: {output[:200]}")
     sys.exit(1)
