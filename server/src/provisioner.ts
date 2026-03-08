@@ -4,6 +4,7 @@ import { VultrClient } from "@hiveclip/vultr";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
+import net from "node:net";
 import { fileURLToPath } from "node:url";
 import type { Db } from "./app.js";
 
@@ -14,15 +15,18 @@ const INSTALL_SCRIPT = path.resolve(__dirname, "../../scripts/install-vnc.py");
 const POLL_INTERVAL = 15_000; // 15 seconds
 const MAX_WAIT = 15 * 60_000; // 15 minutes
 
-interface ProvisionJob {
+export interface ProvisionJob {
   vmId: string;
   boardId: string;
   vultrInstanceId: string;
 }
 
+export type Provisioner = ReturnType<typeof startProvisioningWorker>;
+
 const activeJobs = new Map<string, NodeJS.Timeout>();
 
-export function startProvisioningWorker(db: Db, vultr: VultrClient) {
+export function startProvisioningWorker(db: Db) {
+  const vultr = new VultrClient(process.env.VULTR_API_KEY || "");
   async function updateVmStatus(vmId: string, step: string, progress: number, extra?: Record<string, unknown>) {
     await db.update(vms).set({
       provisioningStep: step,
