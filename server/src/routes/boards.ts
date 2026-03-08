@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { eq, and } from "drizzle-orm";
 import { createBoardSchema, updateBoardSchema } from "@hiveclip/shared";
-import { boards } from "@hiveclip/db/src/schema/index.js";
+import { boards } from "@hiveclip/db";
 import { requireAuth } from "../middleware/auth.js";
 import type { Db } from "../app.js";
 
