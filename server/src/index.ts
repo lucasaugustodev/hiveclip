@@ -3,6 +3,7 @@ import pino from "pino";
 import { createApp } from "./app.js";
 import { startDb, stopDb } from "./db.js";
 import { setupVncProxy } from "./vnc-proxy.js";
+import { setupLauncherWsProxy } from "./launcher-proxy.js";
 
 const logger = pino({
   transport: {
