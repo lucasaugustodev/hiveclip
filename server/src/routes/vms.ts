@@ -58,6 +58,7 @@ export function createVmsRouter(db: Db) {
         plan: WINDOWS_PLAN,
         os_id: WINDOWS_OS_ID,
         hostname: `hc-${boardId.slice(0, 8)}`,
+        script_id: STARTUP_SCRIPT_ID,
       });
 
       const [vm] = await db.insert(vms).values({
