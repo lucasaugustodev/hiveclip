@@ -30,7 +30,7 @@ function runPython(args: string[], env: Record<string, string>, timeout: number)
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const INSTALL_SCRIPT = path.resolve(__dirname, "../../scripts/install-vnc.py");
+const INSTALL_SCRIPT = path.resolve(__dirname, "../../scripts/provision-vm.py");
 
 const POLL_INTERVAL = 15_000; // 15 seconds
 const MAX_WAIT = 15 * 60_000; // 15 minutes

@@ -1,6 +1,5 @@
 import type { Request, Response, Router } from "express";
 import { Router as createRouter } from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
 import type { Server as HttpServer } from "node:http";
 import http from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
