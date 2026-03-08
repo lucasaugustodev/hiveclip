@@ -4,9 +4,18 @@ import type { Server as HttpServer } from "node:http";
 import http from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import jwt from "jsonwebtoken";
+import crypto from "node:crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET || "hiveclip-dev-secret";
 const LAUNCHER_PORT = 3001;
+
+// Session tokens: maps sessionId -> expiry timestamp
+const sessions = new Map<string, number>();
+
+function parseCookies(header: string | undefined): Record<string, string> {
+  if (!header) return {};
+  return Object.fromEntries(header.split(";").map(c => c.trim().split("=").map(s => s.trim())));
+}
 
 /**
  * HTTP reverse proxy: /api/launcher/:ip/* -> http://<ip>:3001/*
@@ -21,19 +30,43 @@ export function createLauncherRouter(): Router {
       return;
     }
 
-    // Verify JWT from Authorization header or query param (iframe can't set headers)
+    // Verify JWT from Authorization header, query param, or session cookie
     const authHeader = req.headers.authorization;
     const queryToken = req.query.token as string | undefined;
     const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : queryToken || null;
-    if (!token) {
+    const cookies = parseCookies(req.headers.cookie);
+    const sessionId = cookies["launcher_session"];
+
+    let authenticated = false;
+
+    // Check JWT token first
+    if (token) {
+      try {
+        jwt.verify(token, JWT_SECRET);
+        authenticated = true;
+      } catch { /* invalid token */ }
+    }
+
+    // Fall back to session cookie
+    if (!authenticated && sessionId) {
+      const expiry = sessions.get(sessionId);
+      if (expiry && expiry > Date.now()) {
+        authenticated = true;
+      } else {
+        sessions.delete(sessionId);
+      }
+    }
+
+    if (!authenticated) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    try {
-      jwt.verify(token, JWT_SECRET);
-    } catch {
-      res.status(401).json({ error: "Invalid token" });
-      return;
+
+    // If authenticated via JWT, create/refresh a session cookie for sub-requests (CSS/JS/etc)
+    if (token) {
+      const sid = crypto.randomBytes(24).toString("hex");
+      sessions.set(sid, Date.now() + 3600_000); // 1 hour
+      res.setHeader("Set-Cookie", `launcher_session=${sid}; Path=/api/launcher/${vmIp}; HttpOnly; SameSite=Lax; Max-Age=3600`);
     }
 
     // Build target URL — *path param is an array in path-to-regexp@8
