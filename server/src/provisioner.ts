@@ -22,7 +22,7 @@ function runPython(args: string[], env: Record<string, string>, timeout: number)
     child.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
     child.on("close", (code) => {
       if (code === 0) resolve({ stdout, stderr });
-      else reject(new Error(`Python exited with code ${code}: ${stderr.slice(0, 300)}`));
+      else reject(new Error(`Python exited with code ${code}: ${stderr.slice(0, 1000)}`));
     });
     child.on("error", reject);
   });
