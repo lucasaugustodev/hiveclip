@@ -16,7 +16,7 @@ const LAUNCHER_PORT = 3001;
 export function createLauncherRouter(): Router {
   const router = createRouter();
 
-  router.all("/:ip/*", (req: Request, res: Response) => {
+  router.all("/:ip/:path(*)", (req: Request, res: Response) => {
     const vmIp = req.params.ip as string;
     if (!/^\d+\.\d+\.\d+\.\d+$/.test(vmIp)) {
       res.status(400).json({ error: "Invalid IP" });
