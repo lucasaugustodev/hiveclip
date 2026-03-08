@@ -5,6 +5,7 @@ import { notFound } from "../middleware/error-handler.js";
 import { vms } from "@hiveclip/db";
 import { VultrClient } from "@hiveclip/vultr";
 import type { Db } from "../app.js";
+import type { Provisioner } from "../provisioner.js";
 
 const VULTR_API_KEY = process.env.VULTR_API_KEY || "";
 const WINDOWS_OS_ID = 501; // Windows 2022 Standard x64
@@ -14,7 +15,7 @@ const STARTUP_SCRIPT_ID = "d2f602f1-11fa-4cf2-bc4f-e90998926898"; // Installs Ti
 
 const vultr = new VultrClient(VULTR_API_KEY);
 
-export function createVmsRouter(db: Db) {
+export function createVmsRouter(db: Db, provisioner: Provisioner) {
   const router = Router();
 
   router.get("/boards/:boardId/vm", requireAuth, async (req, res) => {
