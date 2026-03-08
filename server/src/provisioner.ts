@@ -1,0 +1,168 @@
+import { eq } from "drizzle-orm";
+import { vms } from "@hiveclip/db";
+import { VultrClient } from "@hiveclip/vultr";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import type { Db } from "./app.js";
+
+const execFileAsync = promisify(execFile);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const INSTALL_SCRIPT = path.resolve(__dirname, "../../scripts/install-vnc.py");
+
+const POLL_INTERVAL = 15_000; // 15 seconds
+const MAX_WAIT = 15 * 60_000; // 15 minutes
+
+interface ProvisionJob {
+  vmId: string;
+  boardId: string;
+  vultrInstanceId: string;
+}
+
+const activeJobs = new Map<string, NodeJS.Timeout>();
+
+export function startProvisioningWorker(db: Db, vultr: VultrClient) {
+  async function updateVmStatus(vmId: string, step: string, progress: number, extra?: Record<string, unknown>) {
+    await db.update(vms).set({
+      provisioningStep: step,
+      provisioningProgress: progress,
+      updatedAt: new Date(),
+      ...extra,
+    }).where(eq(vms.id, vmId));
+  }
+
+  async function processJob(job: ProvisionJob) {
+    const { vmId, boardId, vultrInstanceId } = job;
+    const startTime = Date.now();
+
+    console.log(`[Provisioner] Starting for board ${boardId.slice(0, 8)}, VM ${vultrInstanceId.slice(0, 8)}`);
+
+    // Step 1: Wait for VM to boot
+    await updateVmStatus(vmId, "wait_boot", 1);
+    let instance;
+    while (Date.now() - startTime < MAX_WAIT) {
+      try {
+        instance = await vultr.getInstance(vultrInstanceId);
+        await db.update(vms).set({
+          ipAddress: instance.main_ip !== "0.0.0.0" ? instance.main_ip : null,
+          vultrStatus: instance.status,
+          powerStatus: instance.power_status,
+          serverStatus: instance.server_status,
+          updatedAt: new Date(),
+        }).where(eq(vms.id, vmId));
+
+        if (instance.status === "active" && instance.server_status === "ok" && instance.main_ip !== "0.0.0.0") {
+          console.log(`[Provisioner] VM ${vultrInstanceId.slice(0, 8)} is ready at ${instance.main_ip}`);
+          break;
+        }
+      } catch (err: any) {
+        console.error(`[Provisioner] Poll error:`, err.message);
+      }
+      await sleep(POLL_INTERVAL);
+    }
+
+    if (!instance || instance.server_status !== "ok") {
+      console.error(`[Provisioner] Timeout waiting for VM ${vultrInstanceId.slice(0, 8)}`);
+      await updateVmStatus(vmId, "error", 1, { vultrStatus: "timeout" });
+      return;
+    }
+
+    const vmIp = instance.main_ip;
+    const vmPass = instance.default_password;
+
+    // Step 2: Wait a bit for WinRM to be available
+    await updateVmStatus(vmId, "wait_winrm", 3);
+    console.log(`[Provisioner] Waiting for WinRM on ${vmIp}...`);
+    let winrmReady = false;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      try {
+        const { stdout } = await execFileAsync("python", [
+          "-c",
+          `import winrm; s=winrm.Session('${vmIp}',auth=('Administrator','${vmPass}'),transport='ntlm'); r=s.run_cmd('hostname'); print(r.std_out.decode().strip())`
+        ], { timeout: 30_000 });
+        if (stdout.trim()) {
+          console.log(`[Provisioner] WinRM ready on ${vmIp}, hostname: ${stdout.trim()}`);
+          winrmReady = true;
+          break;
+        }
+      } catch {
+        // WinRM not ready yet
+      }
+      await sleep(15_000);
+    }
+
+    if (!winrmReady) {
+      console.error(`[Provisioner] WinRM not available on ${vmIp}`);
+      await updateVmStatus(vmId, "error", 3, { vultrStatus: "winrm_timeout" });
+      return;
+    }
+
+    // Step 3: Install TightVNC
+    await updateVmStatus(vmId, "install_vnc", 6);
+    console.log(`[Provisioner] Installing TightVNC on ${vmIp}...`);
+    try {
+      const { stdout, stderr } = await execFileAsync("python", [
+        INSTALL_SCRIPT, vmIp, vmPass,
+      ], { timeout: 180_000 });
+      console.log(`[Provisioner] VNC install output:`, stdout.slice(-200));
+      if (stderr && !stderr.includes("CLIXML")) {
+        console.warn(`[Provisioner] VNC install stderr:`, stderr.slice(-200));
+      }
+    } catch (err: any) {
+      console.error(`[Provisioner] VNC install failed:`, err.message);
+      await updateVmStatus(vmId, "error", 6);
+      return;
+    }
+
+    // Step 4: Verify VNC is running
+    await updateVmStatus(vmId, "health_check", 10);
+    const vncOk = await checkPort(vmIp, 5900, 30_000);
+    if (!vncOk) {
+      console.error(`[Provisioner] VNC port not open on ${vmIp}`);
+      await updateVmStatus(vmId, "error", 10);
+      return;
+    }
+
+    // Step 5: Done!
+    await updateVmStatus(vmId, "ready", 12, {
+      vncHealthy: true,
+      vncPort: 5900,
+      adminPassword: vmPass,
+    });
+
+    // Update board status
+    const { boards } = await import("@hiveclip/db");
+    await db.update(boards).set({ status: "running", updatedAt: new Date() }).where(eq(boards.id, boardId));
+
+    console.log(`[Provisioner] Board ${boardId.slice(0, 8)} fully provisioned! VNC ready at ${vmIp}:5900`);
+    activeJobs.delete(boardId);
+  }
+
+  function enqueue(job: ProvisionJob) {
+    if (activeJobs.has(job.boardId)) return;
+    // Start immediately in background
+    activeJobs.set(job.boardId, setTimeout(() => {}, 0));
+    processJob(job).catch((err) => {
+      console.error(`[Provisioner] Unexpected error:`, err);
+      activeJobs.delete(job.boardId);
+    });
+  }
+
+  return { enqueue };
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function checkPort(host: string, port: number, timeout: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const net = require("node:net");
+    const s = new net.Socket();
+    s.setTimeout(timeout);
+    s.connect(port, host, () => { s.destroy(); resolve(true); });
+    s.on("timeout", () => { s.destroy(); resolve(false); });
+    s.on("error", () => { s.destroy(); resolve(false); });
+  });
+}
