@@ -7,6 +7,7 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { BoardListPage } from "./pages/BoardListPage";
 import { BoardDashboard } from "./pages/BoardDashboard";
 import { DesktopPage } from "./pages/DesktopPage";
+import { LauncherPage } from "./pages/LauncherPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
