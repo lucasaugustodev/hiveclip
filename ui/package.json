@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@hiveclip/shared": "workspace:*",
-    "@novnc/novnc": "^1.5.0",
+    "@novnc/novnc": "^1.6.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.90.21",
     "class-variance-authority": "^0.7.1",
