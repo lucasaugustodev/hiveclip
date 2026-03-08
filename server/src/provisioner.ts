@@ -133,7 +133,7 @@ export function startProvisioningWorker(db: Db) {
     console.log(`[Provisioner] Installing TightVNC on ${vmIp}...`);
     try {
       const { stdout, stderr } = await runPython([
-        INSTALL_SCRIPT, vmIp, vmPass,
+        INSTALL_SCRIPT,
       ], { VM_IP: vmIp, VM_PASS: vmPass }, 300_000);
       console.log(`[Provisioner] VNC install output:`, stdout.slice(-200));
       if (stderr && !stderr.includes("CLIXML")) {
