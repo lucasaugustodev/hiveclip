@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchBoard } from "../api/boards";
-import { fetchVm, provisionVm, startVm, stopVm } from "../api/vms";
+import { fetchVm, provisionVm, startVm, stopVm, reprovisionVm } from "../api/vms";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { VmStatusBadge } from "../components/VmStatusBadge";
