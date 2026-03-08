@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { notFound } from "../middleware/error-handler.js";
-import { vms } from "@hiveclip/db/src/schema/index.js";
+import { vms } from "@hiveclip/db";
 import { VultrClient } from "@hiveclip/vultr";
 import type { Db } from "../app.js";
 
