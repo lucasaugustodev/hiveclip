@@ -45,4 +45,5 @@ export interface CreateInstanceOpts {
   os_id: number;
   hostname?: string;
   tag?: string;
+  script_id?: string;
 }
