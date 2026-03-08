@@ -36,8 +36,9 @@ export function createLauncherRouter(): Router {
       return;
     }
 
-    // Build target URL
-    const subPath = (req.params as Record<string, string>).path || "";
+    // Build target URL — *path param is an array in path-to-regexp@8
+    const rawPath = (req.params as Record<string, string | string[]>).path;
+    const subPath = Array.isArray(rawPath) ? rawPath.join("/") : rawPath || "";
     const url = new URL(req.url!, `http://${req.headers.host}`);
     url.searchParams.delete("token");
     const qs = url.searchParams.toString();
@@ -68,7 +69,7 @@ export function createLauncherRouter(): Router {
 
   // Handle both root and subpaths
   router.all("/:ip", proxyHandler);
-  router.all("/:ip/:path(.*)", proxyHandler);
+  router.all("/:ip/*path", proxyHandler);
 
   return router;
 }
