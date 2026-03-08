@@ -83,14 +83,18 @@ export function BoardDashboard() {
                 <p>Region: {vm.region}</p>
                 <p>Plan: {vm.plan}</p>
                 <p>IP: {vm.ipAddress || "Pending..."}</p>
-                {vm.provisioningStep && vm.provisioningStep !== "ready" && (
-                  <div className="mt-2 space-y-1">
+                <p>Power: {vm.powerStatus || "unknown"}</p>
+                <p>Server: {vm.serverStatus || "unknown"}</p>
+                <p>Vultr: {vm.vultrStatus || "unknown"}</p>
+                {vm.vncHealthy && <p>VNC: port {vm.vncPort || 5900}</p>}
+                {vm.provisioningStep && vm.provisioningStep !== "ready" && vm.provisioningStep !== "error" && (
+                  <div className="mt-2 space-y-1 p-2 rounded bg-muted/50 border border-border">
                     <p className="text-xs font-medium text-primary">
                       {vm.provisioningStep === "wait_boot" && "Waiting for VM to boot..."}
                       {vm.provisioningStep === "wait_winrm" && "Waiting for remote management..."}
                       {vm.provisioningStep === "install_vnc" && "Installing VNC server..."}
                       {vm.provisioningStep === "health_check" && "Verifying VNC connection..."}
-                      {vm.provisioningStep === "error" && "Provisioning error"}
+                      {!["wait_boot", "wait_winrm", "install_vnc", "health_check"].includes(vm.provisioningStep) && `Step: ${vm.provisioningStep}`}
                     </p>
                     <div className="w-full bg-muted rounded-full h-1.5">
                       <div
@@ -98,10 +102,17 @@ export function BoardDashboard() {
                         style={{ width: `${((vm.provisioningProgress || 0) / 12) * 100}%` }}
                       />
                     </div>
+                    <p className="text-[10px] text-muted-foreground">Step {vm.provisioningProgress || 0} of 12</p>
                   </div>
                 )}
                 {vm.provisioningStep === "ready" && (
                   <p className="text-xs font-medium text-green-500 mt-1">VNC ready</p>
+                )}
+                {vm.provisioningStep === "error" && (
+                  <p className="text-xs font-medium text-destructive mt-1">Provisioning error</p>
+                )}
+                {!vm.provisioningStep && vm.ipAddress && vm.powerStatus === "running" && (
+                  <p className="text-xs text-muted-foreground mt-1">VM running (provisioned before auto-setup)</p>
                 )}
               </div>
             )}
