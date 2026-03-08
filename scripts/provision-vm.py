@@ -141,17 +141,23 @@ r = s.run_cmd('netsh advfirewall firewall add rule name=ClaudeLauncher-3001 dir=
 print(f"Firewall port 3001: RC={r.status_code}")
 
 # Create a scheduled task to auto-start claude-launcher-web
+# Run as Administrator so it inherits the user PATH (npm global bin, CLIs, etc.)
 print("Creating auto-start task...")
 task_cmd = (
-    r'schtasks /create /tn "ClaudeLauncherWeb" /tr '
-    r'"cmd /c cd /d C:\claude-launcher-web && set PORT=3001 && node server.js" '
-    r'/sc onstart /ru SYSTEM /rl HIGHEST /f'
+    'schtasks /create /tn "ClaudeLauncherWeb" /tr '
+    '"cmd /c cd /d C:\\claude-launcher-web && set PORT=3001 && node server.js" '
+    f'/sc onstart /ru Administrator /rp "{pw}" /rl HIGHEST /f'
 )
 r = s.run_cmd(task_cmd)
 print(f"  Task create RC: {r.status_code}")
+if r.status_code != 0:
+    print(f"  stderr: {r.std_err.decode()[:150]}")
 
 # Start it now
 print("Starting claude-launcher-web...")
+# Kill any existing instance first, then start fresh
+s.run_cmd('taskkill /f /im node.exe 2>nul')
+time.sleep(2)
 r = s.run_cmd(r'schtasks /run /tn "ClaudeLauncherWeb"')
 print(f"  Task run RC: {r.status_code}")
 
