@@ -1,7 +1,7 @@
 import EmbeddedPostgres from "embedded-postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "@hiveclip/db/src/schema/index.js";
+import * as schema from "@hiveclip/db";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
