@@ -83,7 +83,9 @@ export function startProvisioningWorker(db: Db) {
       try {
         const { stdout } = await execFileAsync("python", [
           "-c",
-          `import winrm; s=winrm.Session('${vmIp}',auth=('Administrator','${vmPass}'),transport='ntlm'); r=s.run_cmd('hostname'); print(r.std_out.decode().strip())`
+          `import sys,winrm; s=winrm.Session(sys.argv[1],auth=('Administrator',sys.argv[2]),transport='ntlm'); r=s.run_cmd('hostname'); print(r.std_out.decode().strip())`,
+          vmIp,
+          vmPass,
         ], { timeout: 30_000 });
         if (stdout.trim()) {
           console.log(`[Provisioner] WinRM ready on ${vmIp}, hostname: ${stdout.trim()}`);
