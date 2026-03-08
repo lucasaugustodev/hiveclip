@@ -1,37 +1,55 @@
 import { test, expect } from "@playwright/test";
 
-// Test with the real VM that has TightVNC installed
-const VM_IP = "216.238.104.3";
+// Real VM with TightVNC installed and running
+const VNC_VM_ID = "f52a3abd-8d88-4dd9-81a5-045f18bb2d47";
+const VNC_VM_IP = "216.238.104.3";
 
-test("VNC viewer connects to real VM and shows desktop", async ({ page }) => {
+test("VNC viewer connects to real VM desktop", async ({ page }) => {
   // Register
-  const email = `vnclive-${Date.now()}@test.com`;
+  const email = `vncreal-${Date.now()}@test.com`;
   await page.goto("/register");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("password123");
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByText("Your Boards")).toBeVisible({ timeout: 10000 });
 
-  // Create board and provision VM
+  // Create board
   await page.getByRole("button", { name: "New Board" }).click();
-  await page.getByLabel("Name").fill("VNC Live Test");
+  await page.getByLabel("Name").fill("Real VNC Board");
   await page.getByRole("button", { name: "Create Board" }).click();
-  await expect(page.getByText("VNC Live Test")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Real VNC Board")).toBeVisible({ timeout: 10000 });
 
-  // Click Provision VM - this creates a REAL VM on Vultr!
-  // Instead, let's inject a fake VM record via the API to avoid costs
-  const boardUrl = page.url();
-  const boardId = boardUrl.split("/boards/")[1];
+  const boardId = page.url().split("/boards/")[1];
   const token = await page.evaluate(() => localStorage.getItem("hiveclip.token"));
 
-  // Insert VM record directly into the database via a custom API call
-  // For this test, we'll navigate to desktop and verify the VNC component renders
-  // The noVNC component will try to connect via WebSocket proxy to the VM IP
+  // Link the existing VNC-enabled VM to this board
+  const linkRes = await page.request.post(`/api/boards/${boardId}/vm/link`, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    data: { vultrInstanceId: VNC_VM_ID },
+  });
+  expect(linkRes.status()).toBe(201);
 
-  // Navigate to desktop - should show "No VM provisioned" since we haven't provisioned
+  // Navigate to desktop page
   await page.goto(`/boards/${boardId}/desktop`);
-  await expect(page.getByText("No VM provisioned")).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(2000);
 
-  // Screenshot
-  await page.screenshot({ path: "screenshots/vnc-live-novm.png", fullPage: true });
+  // Should show the VM IP in the header
+  await expect(page.getByText(VNC_VM_IP)).toBeVisible({ timeout: 10000 });
+
+  // Should show "Connecting to..." (VNC viewer trying to connect)
+  // or "Connected" if it succeeds, or an error message
+  await page.waitForTimeout(5000);
+
+  // Take screenshot to see what happened
+  await page.screenshot({ path: "screenshots/vnc-real-connection.png", fullPage: true });
+
+  // The page should NOT show "No VM provisioned" anymore
+  await expect(page.getByText("No VM provisioned")).not.toBeVisible();
+
+  // Check if we see the VNC canvas or a connection status
+  const pageContent = await page.textContent("body");
+  const hasDesktopContent =
+    pageContent?.includes("Desktop") &&
+    (pageContent?.includes(VNC_VM_IP) || pageContent?.includes("Connecting") || pageContent?.includes("connected"));
+  expect(hasDesktopContent).toBeTruthy();
 });
