@@ -128,5 +128,34 @@ export function createVmsRouter(db: Db) {
     }
   });
 
+  // Dev-only: link an existing Vultr VM to a board
+  router.post("/boards/:boardId/vm/link", requireAuth, async (req, res) => {
+    const { boardId } = req.params;
+    const { vultrInstanceId } = req.body;
+    if (!vultrInstanceId) {
+      res.status(400).json({ error: "vultrInstanceId required" });
+      return;
+    }
+    try {
+      const instance = await vultr.getInstance(vultrInstanceId);
+      const [vm] = await db.insert(vms).values({
+        boardId,
+        vultrInstanceId: instance.id,
+        region: instance.region,
+        plan: instance.plan,
+        os: instance.os,
+        hostname: instance.label,
+        ipAddress: instance.main_ip !== "0.0.0.0" ? instance.main_ip : null,
+        adminPassword: instance.default_password,
+        vultrStatus: instance.status,
+        powerStatus: instance.power_status,
+        serverStatus: instance.server_status,
+      }).returning();
+      res.status(201).json(vm);
+    } catch (err: any) {
+      res.status(502).json({ error: `Link failed: ${err.message}` });
+    }
+  });
+
   return router;
 }
