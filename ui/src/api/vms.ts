@@ -12,4 +12,5 @@ export const provisionVm = (boardId: string) => api.post(`/boards/${boardId}/vm/
 export const startVm = (boardId: string) => api.post(`/boards/${boardId}/vm/start`);
 export const stopVm = (boardId: string) => api.post(`/boards/${boardId}/vm/stop`);
 export const rebootVm = (boardId: string) => api.post(`/boards/${boardId}/vm/reboot`);
+export const reprovisionVm = (boardId: string) => api.post(`/boards/${boardId}/vm/reprovision`);
 export const destroyVm = (boardId: string) => api.delete(`/boards/${boardId}/vm`);
