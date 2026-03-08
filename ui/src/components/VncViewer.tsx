@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+// @ts-expect-error no types for noVNC
+import RFB from "@novnc/novnc/lib/rfb.js";
 
 interface VncViewerProps {
   ip: string;
@@ -26,38 +28,77 @@ export function VncViewer({ ip, password }: VncViewerProps) {
 
     setStatus("connecting");
 
-    // Dynamically import noVNC from CDN
-    import("https://cdn.jsdelivr.net/npm/@nicedoc/novnc@0.0.5/lib/rfb.min.js" as any)
-      .catch(() => {
-        // Fallback: use raw WebSocket + manual VNC handshake is too complex.
-        // Instead, create an iframe with noVNC's HTML client
-        setStatus("error");
-        setErrorMsg("noVNC module could not be loaded. Using iframe fallback...");
+    try {
+      const rfb = new RFB(containerRef.current, wsUrl, {
+        credentials: { password: password || "" },
       });
 
-    // Use WebSocket directly as a simpler approach
-    const ws = new WebSocket(wsUrl);
-    ws.binaryType = "arraybuffer";
+      rfb.scaleViewport = true;
+      rfb.resizeSession = true;
+      rfb.showDotCursor = true;
 
-    ws.onopen = () => {
-      setStatus("connected");
-    };
+      rfb.addEventListener("connect", () => {
+        setStatus("connected");
+      });
 
-    ws.onerror = () => {
+      rfb.addEventListener("disconnect", (e: any) => {
+        if (e.detail?.clean) {
+          setStatus("disconnected");
+        } else {
+          setStatus("error");
+          setErrorMsg("Connection lost. VNC server may not be running on the VM yet.");
+        }
+      });
+
+      rfb.addEventListener("credentialsrequired", () => {
+        if (password) {
+          rfb.sendCredentials({ password });
+        } else {
+          setStatus("error");
+          setErrorMsg("VNC password required");
+        }
+      });
+
+      rfbRef.current = rfb;
+    } catch (err: any) {
       setStatus("error");
-      setErrorMsg("WebSocket connection failed. Make sure VNC server is running on the VM.");
-    };
-
-    ws.onclose = () => {
-      if (status === "connected") {
-        setStatus("disconnected");
-      }
-    };
+      setErrorMsg(err.message || "Failed to connect");
+    }
 
     return () => {
-      ws.close();
+      if (rfbRef.current) {
+        rfbRef.current.disconnect();
+        rfbRef.current = null;
+      }
     };
   }, [ip, password]);
 
-  return null; // placeholder - will be replaced below
+  return (
+    <div className="relative flex-1 flex flex-col">
+      {status === "connecting" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+          <div className="text-center space-y-2">
+            <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+            <p className="text-sm text-muted-foreground">Connecting to {ip}...</p>
+          </div>
+        </div>
+      )}
+      {status === "error" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+          <div className="text-center space-y-2 max-w-md px-4">
+            <p className="text-sm text-destructive">{errorMsg}</p>
+            <p className="text-xs text-muted-foreground">
+              TightVNC installs automatically on new VMs. It may take 10-15 minutes after provisioning.
+            </p>
+          </div>
+        </div>
+      )}
+      {status === "disconnected" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+          <p className="text-sm text-muted-foreground">Disconnected from remote desktop</p>
+        </div>
+      )}
+      <div ref={containerRef} className="flex-1" />
+    </div>
+  );
 }
