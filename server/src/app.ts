@@ -8,6 +8,7 @@ import { createAuthRouter } from "./routes/auth.js";
 import { createBoardsRouter } from "./routes/boards.js";
 import { createVmsRouter } from "./routes/vms.js";
 import { errorHandler } from "./middleware/error-handler.js";
+import { startProvisioningWorker } from "./provisioner.js";
 
 export type Db = PostgresJsDatabase<typeof schema>;
 
@@ -17,10 +18,12 @@ export function createApp(logger: Logger, db: Db) {
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === "/api/health" } }));
   app.use(express.json());
 
+  const provisioner = startProvisioningWorker(db);
+
   app.use("/api/health", healthRouter);
   app.use("/api/auth", createAuthRouter(db));
   app.use("/api/boards", createBoardsRouter(db));
-  app.use("/api", createVmsRouter(db));
+  app.use("/api", createVmsRouter(db, provisioner));
 
   app.use(errorHandler);
 
