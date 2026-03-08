@@ -36,7 +36,7 @@ export function DesktopPage() {
         </div>
       </div>
       <div className="flex-1 flex items-center justify-center bg-black/90 text-muted-foreground">
-        {vm?.status === "running" ? (
+        {vm?.powerStatus === "running" ? (
           <div className="text-center space-y-2">
             <p className="text-lg">noVNC Viewer</p>
             <p className="text-sm">WebSocket connection to {vm.ipAddress || "VM"}:5900</p>
