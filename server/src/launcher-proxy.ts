@@ -126,7 +126,10 @@ export function setupLauncherWsProxy(server: HttpServer) {
   server.removeAllListeners("upgrade");
 
   server.on("upgrade", (req, socket, head) => {
-    const match = req.url?.match(/^\/api\/launcher-ws\/(\d+\.\d+\.\d+\.\d+)/);
+    // Match both /api/launcher-ws/:ip and /api/launcher/:ip/ws (iframe path)
+    const matchDedicated = req.url?.match(/^\/api\/launcher-ws\/(\d+\.\d+\.\d+\.\d+)/);
+    const matchInline = req.url?.match(/^\/api\/launcher\/(\d+\.\d+\.\d+\.\d+)\/ws/);
+    const match = matchDedicated || matchInline;
     if (!match) {
       for (const listener of existingListeners) {
         (listener as Function).call(server, req, socket, head);
@@ -136,14 +139,22 @@ export function setupLauncherWsProxy(server: HttpServer) {
 
     const url = new URL(req.url!, `http://${req.headers.host}`);
     const token = url.searchParams.get("token");
-    if (!token) {
-      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-      socket.destroy();
-      return;
+
+    // Also check session cookie for auth (iframe sub-requests)
+    const cookieHeader = req.headers.cookie;
+    const cookies = cookieHeader ? Object.fromEntries(cookieHeader.split(";").map(c => c.trim().split("=").map(s => s.trim()))) : {};
+    const sessionId = cookies["launcher_session"];
+
+    let authenticated = false;
+    if (token) {
+      try { jwt.verify(token, JWT_SECRET); authenticated = true; } catch {}
     }
-    try {
-      jwt.verify(token, JWT_SECRET);
-    } catch {
+    if (!authenticated && sessionId) {
+      const expiry = sessions.get(sessionId);
+      if (expiry && expiry > Date.now()) authenticated = true;
+    }
+
+    if (!authenticated) {
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
       return;
@@ -152,7 +163,13 @@ export function setupLauncherWsProxy(server: HttpServer) {
     const vmIp = match[1];
 
     wss.handleUpgrade(req, socket, head, (clientWs) => {
-      const vmWsUrl = `ws://${vmIp}:${LAUNCHER_PORT}${req.url?.replace(/^\/api\/launcher-ws\/\d+\.\d+\.\d+\.\d+/, "") || ""}`;
+      // For inline path, strip /api/launcher/IP prefix and forward the rest
+      // For dedicated path, strip /api/launcher-ws/IP prefix
+      const stripPattern = matchDedicated
+        ? /^\/api\/launcher-ws\/\d+\.\d+\.\d+\.\d+/
+        : /^\/api\/launcher\/\d+\.\d+\.\d+\.\d+/;
+      const vmWsPath = req.url?.replace(stripPattern, "") || "";
+      const vmWsUrl = `ws://${vmIp}:${LAUNCHER_PORT}${vmWsPath}`;
       const vmWs = new WebSocket(vmWsUrl);
 
       vmWs.on("open", () => {
