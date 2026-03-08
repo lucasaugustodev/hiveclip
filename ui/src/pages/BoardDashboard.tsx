@@ -96,9 +96,10 @@ export function BoardDashboard() {
                     <p className="text-xs font-medium text-primary">
                       {vm.provisioningStep === "wait_boot" && "Waiting for VM to boot..."}
                       {vm.provisioningStep === "wait_winrm" && "Waiting for remote management..."}
+                      {vm.provisioningStep === "install_software" && "Installing software (VNC, Launcher, CLIs)..."}
                       {vm.provisioningStep === "install_vnc" && "Installing VNC server..."}
                       {vm.provisioningStep === "health_check" && "Verifying VNC connection..."}
-                      {!["wait_boot", "wait_winrm", "install_vnc", "health_check"].includes(vm.provisioningStep) && `Step: ${vm.provisioningStep}`}
+                      {!["wait_boot", "wait_winrm", "install_software", "install_vnc", "health_check"].includes(vm.provisioningStep) && `Step: ${vm.provisioningStep}`}
                     </p>
                     <div className="w-full bg-muted rounded-full h-1.5">
                       <div
