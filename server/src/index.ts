@@ -1,6 +1,7 @@
 import "dotenv/config";
 import pino from "pino";
 import { createApp } from "./app.js";
+import { startDb, stopDb } from "./db.js";
 
 const logger = pino({
   transport: {
@@ -11,19 +12,31 @@ const logger = pino({
 
 const PORT = Number(process.env.PORT) || 3100;
 
-const app = createApp(logger);
+async function main() {
+  logger.info("Starting embedded PostgreSQL...");
+  const { db } = await startDb();
+  logger.info("PostgreSQL ready");
 
-const server = app.listen(PORT, () => {
-  logger.info(`HiveClip Control Plane listening on port ${PORT}`);
-});
+  const app = createApp(logger, db);
 
-function shutdown() {
-  logger.info("Shutting down gracefully...");
-  server.close(() => {
-    logger.info("Server closed");
-    process.exit(0);
+  const server = app.listen(PORT, () => {
+    logger.info(`HiveClip Control Plane listening on port ${PORT}`);
   });
+
+  async function shutdown() {
+    logger.info("Shutting down gracefully...");
+    server.close(async () => {
+      await stopDb();
+      logger.info("Server closed");
+      process.exit(0);
+    });
+  }
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
 
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+main().catch((err) => {
+  logger.error(err, "Failed to start");
+  process.exit(1);
+});
