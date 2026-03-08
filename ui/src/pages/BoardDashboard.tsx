@@ -155,6 +155,25 @@ export function BoardDashboard() {
             )}
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Terminal className="h-4 w-4" />
+              Claude Launcher
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {vm?.powerStatus === "running" ? (
+              <Link to={`/boards/${boardId}/launcher`}>
+                <Button className="w-full" variant="outline">
+                  <Terminal className="mr-2 h-4 w-4" />Open Launcher
+                </Button>
+              </Link>
+            ) : (
+              <p className="text-sm text-muted-foreground">VM must be running to access Claude Launcher.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
