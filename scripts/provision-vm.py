@@ -161,6 +161,81 @@ r = s.run_cmd('powershell -c "Test-NetConnection -ComputerName localhost -Port 3
 port_ok = r.std_out.decode().strip()
 print(f"Port 3001 listening: {port_ok}")
 
+# ========== STEP 3: Install Dev CLIs ==========
+print("\n=== Step 3: Dev CLIs ===")
+
+# Refresh PATH so newly installed Node/Git/npm are available
+r = s.run_ps('[Environment]::GetEnvironmentVariable("Path","Machine")')
+machine_path = r.std_out.decode().strip()
+r = s.run_ps('[Environment]::GetEnvironmentVariable("Path","User")')
+user_path = r.std_out.decode().strip()
+full_path = machine_path + ";" + user_path
+# Common paths that might not be in PATH yet
+extra = r"C:\Program Files\nodejs;C:\Program Files\Git\cmd;C:\Program Files\GitHub CLI"
+full_path = extra + ";" + full_path
+
+def run_with_path(cmd, label="", timeout_sec=120):
+    """Run a cmd with refreshed PATH"""
+    wrapped = f'cmd /c "set PATH={full_path} && {cmd}"'
+    r = s.run_cmd(wrapped)
+    out = r.std_out.decode().strip()
+    err = r.std_err.decode().strip()
+    if label:
+        if r.status_code == 0:
+            print(f"  {label}: OK - {out[:100]}")
+        else:
+            print(f"  {label}: RC={r.status_code} - {(err or out)[:150]}")
+    return r
+
+# --- Claude Code CLI ---
+print("Installing Claude Code CLI...")
+r = run_with_path('npm list -g @anthropic-ai/claude-code', "Check claude")
+if r.status_code != 0:
+    run_with_path('npm install -g @anthropic-ai/claude-code', "npm install claude-code")
+run_with_path('claude --version', "Claude Code")
+
+# --- GitHub CLI ---
+print("Installing GitHub CLI...")
+r = run_with_path('gh --version', "Check gh")
+if r.status_code != 0:
+    print("  Downloading GitHub CLI...")
+    r = s.run_cmd(
+        'curl.exe -L -o C:/Users/Administrator/gh-setup.msi '
+        '"https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_windows_amd64.msi" '
+        '--connect-timeout 15 --max-time 180'
+    )
+    if r.status_code == 0:
+        r2 = s.run_cmd(r'msiexec /i C:\Users\Administrator\gh-setup.msi /quiet /norestart')
+        print(f"  GitHub CLI install RC: {r2.status_code}")
+        time.sleep(3)
+        run_with_path('gh --version', "GitHub CLI")
+    else:
+        print("  WARNING: GitHub CLI download failed")
+else:
+    print(f"  GitHub CLI already installed")
+
+# --- Gemini CLI ---
+print("Installing Gemini CLI...")
+r = run_with_path('npm list -g @anthropic-ai/claude-code', "Check gemini")
+# Gemini CLI is @anthropic-ai/claude-code... actually it's @anthropic-ai/gemini-cli or similar
+# Let's use the google one: npm install -g @anthropic-ai/claude-code
+r = run_with_path('npm list -g @google/gemini-cli', "Check gemini-cli")
+if r.status_code != 0:
+    run_with_path('npm install -g @google/gemini-cli', "npm install gemini-cli")
+run_with_path('gemini --version', "Gemini CLI")
+
+# --- Cline CLI ---
+print("Installing Cline CLI...")
+r = run_with_path('npm list -g cline', "Check cline")
+if r.status_code != 0:
+    run_with_path('npm install -g cline', "npm install cline")
+run_with_path('cline --version', "Cline CLI")
+
+# --- Python (already available on Windows Server) ---
+print("Checking Python...")
+run_with_path('python --version', "Python")
+
 print("\n=== Provisioning complete ===")
 print(f"  VNC: {ip}:5900 (password: hiveclip123)")
 print(f"  Launcher: {ip}:3001")
+print(f"  CLIs: claude, gh, gemini, cline")
