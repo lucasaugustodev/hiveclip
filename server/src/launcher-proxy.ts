@@ -39,7 +39,7 @@ export function createLauncherRouter(): Router {
     }
 
     // Strip /api/launcher/:ip from the path, remove our token param from query
-    const targetPath = req.params[0] || "";
+    const targetPath = (req.params as any).path || "";
     const targetUrl = `http://${vmIp}:${LAUNCHER_PORT}`;
     const url = new URL(req.url!, `http://${req.headers.host}`);
     url.searchParams.delete("token");
