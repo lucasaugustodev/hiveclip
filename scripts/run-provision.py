@@ -1,6 +1,9 @@
-import os, subprocess, sys
+import os, sys
+
+# Set credentials directly in this process's environment
 os.environ["VM_IP"] = "216.238.115.143"
-os.environ["VM_PASS"] = "y)7Mtvp97m%(}dAx"
-script = os.path.join(os.path.dirname(__file__), "provision-vm.py")
-result = subprocess.run([sys.executable, script], env=os.environ)
-sys.exit(result.returncode)
+os.environ["VM_PASS"] = r"y)7Mtvp97m%(}dAx"
+
+# Execute provision-vm.py in the same process
+script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "provision-vm.py")
+exec(open(script).read())
