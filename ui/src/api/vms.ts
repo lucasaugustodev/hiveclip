@@ -1,6 +1,13 @@
 import type { Vm } from "@hiveclip/shared";
 import { api } from "./client.js";
-export const fetchVm = (boardId: string) => api.get<Vm>(`/boards/${boardId}/vm`);
+
+export const fetchVm = async (boardId: string): Promise<Vm | null> => {
+  try {
+    return await api.get<Vm>(`/boards/${boardId}/vm`);
+  } catch {
+    return null;
+  }
+};
 export const provisionVm = (boardId: string) => api.post(`/boards/${boardId}/vm/provision`);
 export const startVm = (boardId: string) => api.post(`/boards/${boardId}/vm/start`);
 export const stopVm = (boardId: string) => api.post(`/boards/${boardId}/vm/stop`);
