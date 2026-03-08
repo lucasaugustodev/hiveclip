@@ -2,7 +2,7 @@ import express from "express";
 import pinoHttp from "pino-http";
 import type { Logger } from "pino";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import type * as schema from "@hiveclip/db/src/schema/index.js";
+import type * as schema from "@hiveclip/db";
 import { healthRouter } from "./routes/health.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createBoardsRouter } from "./routes/boards.js";
