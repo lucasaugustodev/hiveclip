@@ -24,6 +24,9 @@ async function main() {
     logger.info(`HiveClip Control Plane listening on port ${PORT}`);
   });
 
+  setupVncProxy(server);
+  logger.info("VNC WebSocket proxy ready");
+
   async function shutdown() {
     logger.info("Shutting down gracefully...");
     server.close(async () => {
