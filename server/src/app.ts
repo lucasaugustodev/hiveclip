@@ -9,6 +9,7 @@ import { createBoardsRouter } from "./routes/boards.js";
 import { createVmsRouter } from "./routes/vms.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { startProvisioningWorker } from "./provisioner.js";
+import { createLauncherRouter } from "./launcher-proxy.js";
 
 export type Db = PostgresJsDatabase<typeof schema>;
 
