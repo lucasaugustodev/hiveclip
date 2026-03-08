@@ -95,7 +95,7 @@ export function BoardDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {vm?.status === "running" ? (
+            {vm?.powerStatus === "running" ? (
               <Link to={`/boards/${boardId}/desktop`}>
                 <Button className="w-full">
                   <Monitor className="mr-2 h-4 w-4" />Open Desktop
