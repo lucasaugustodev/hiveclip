@@ -132,9 +132,9 @@ export function startProvisioningWorker(db: Db) {
     await updateVmStatus(vmId, "install_vnc", 6);
     console.log(`[Provisioner] Installing TightVNC on ${vmIp}...`);
     try {
-      const { stdout, stderr } = await execFileAsync("python", [
+      const { stdout, stderr } = await runPython([
         INSTALL_SCRIPT, vmIp, vmPass,
-      ], { timeout: 300_000 });
+      ], { VM_IP: vmIp, VM_PASS: vmPass }, 300_000);
       console.log(`[Provisioner] VNC install output:`, stdout.slice(-200));
       if (stderr && !stderr.includes("CLIXML")) {
         console.warn(`[Provisioner] VNC install stderr:`, stderr.slice(-200));
