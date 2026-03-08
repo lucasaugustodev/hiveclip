@@ -5,7 +5,7 @@ import { fetchVm, provisionVm, startVm, stopVm, reprovisionVm } from "../api/vms
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { VmStatusBadge } from "../components/VmStatusBadge";
-import { Monitor, Play, Square, Server, ArrowLeft } from "lucide-react";
+import { Monitor, Play, Square, Server, ArrowLeft, Terminal } from "lucide-react";
 
 export function BoardDashboard() {
   const { boardId } = useParams<{ boardId: string }>();
