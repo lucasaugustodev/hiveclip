@@ -70,7 +70,7 @@ export function DesktopPage() {
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <p>No VM IP available. Provision a VM from the dashboard first.</p>
+            <p>No VM provisioned. Go to the dashboard to provision one first.</p>
           </div>
         )}
       </div>
