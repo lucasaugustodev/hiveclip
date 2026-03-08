@@ -162,7 +162,6 @@ function sleep(ms: number) {
 
 function checkPort(host: string, port: number, timeout: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const net = require("node:net");
     const s = new net.Socket();
     s.setTimeout(timeout);
     s.connect(port, host, () => { s.destroy(); resolve(true); });
