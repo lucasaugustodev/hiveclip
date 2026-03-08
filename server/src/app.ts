@@ -25,6 +25,7 @@ export function createApp(logger: Logger, db: Db) {
   app.use("/api/auth", createAuthRouter(db));
   app.use("/api/boards", createBoardsRouter(db));
   app.use("/api", createVmsRouter(db, provisioner));
+  app.use("/api/launcher", createLauncherRouter());
 
   app.use(errorHandler);
 
