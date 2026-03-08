@@ -126,11 +126,14 @@ export function setupLauncherWsProxy(server: HttpServer) {
   server.removeAllListeners("upgrade");
 
   server.on("upgrade", (req, socket, head) => {
+    console.log(`[Launcher WS] Upgrade request: ${req.url}`);
     // Match both /api/launcher-ws/:ip and /api/launcher/:ip/ws (iframe path)
     const matchDedicated = req.url?.match(/^\/api\/launcher-ws\/(\d+\.\d+\.\d+\.\d+)/);
     const matchInline = req.url?.match(/^\/api\/launcher\/(\d+\.\d+\.\d+\.\d+)\/ws/);
     const match = matchDedicated || matchInline;
+    console.log(`[Launcher WS] matchDedicated=${!!matchDedicated}, matchInline=${!!matchInline}`);
     if (!match) {
+      console.log(`[Launcher WS] No match, passing to ${existingListeners.length} existing listeners`);
       for (const listener of existingListeners) {
         (listener as Function).call(server, req, socket, head);
       }
@@ -139,6 +142,7 @@ export function setupLauncherWsProxy(server: HttpServer) {
 
     const url = new URL(req.url!, `http://${req.headers.host}`);
     const token = url.searchParams.get("token");
+    console.log(`[Launcher WS] IP=${match[1]}, hasToken=${!!token}`);
 
     // Also check session cookie for auth (iframe sub-requests)
     const cookieHeader = req.headers.cookie;
