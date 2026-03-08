@@ -75,6 +75,13 @@ export function createVmsRouter(db: Db, provisioner: Provisioner) {
         serverStatus: instance.server_status,
       }).returning();
 
+      // Start background provisioning (waits for boot, installs VNC, etc.)
+      provisioner.enqueue({
+        vmId: vm.id,
+        boardId,
+        vultrInstanceId: instance.id,
+      });
+
       res.status(202).json({
         message: "VM provisioning started",
         vm,
