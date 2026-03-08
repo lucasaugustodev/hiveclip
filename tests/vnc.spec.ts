@@ -25,7 +25,7 @@ test.describe("VNC Desktop Viewer", () => {
     await expect(page.getByText("Desktop Test — Desktop")).toBeVisible();
 
     // Without a VM provisioned, it should show "No VM IP available"
-    await expect(page.getByText("No VM IP available")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("No VM provisioned")).toBeVisible({ timeout: 5000 });
 
     await page.screenshot({ path: "screenshots/vnc-no-vm.png", fullPage: true });
   });
