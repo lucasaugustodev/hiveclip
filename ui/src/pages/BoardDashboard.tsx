@@ -36,6 +36,10 @@ export function BoardDashboard() {
     mutationFn: () => stopVm(boardId!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vm", boardId] }),
   });
+  const reprovision = useMutation({
+    mutationFn: () => reprovisionVm(boardId!),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vm", boardId] }),
+  });
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading board...</div>;
   if (!board) return <div className="p-6 text-destructive">Board not found</div>;
