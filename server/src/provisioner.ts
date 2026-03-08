@@ -107,12 +107,10 @@ export function startProvisioningWorker(db: Db) {
     for (let attempt = 0; attempt < 30; attempt++) {
       try {
         console.log(`[Provisioner] WinRM attempt ${attempt + 1}/30 on ${vmIp}...`);
-        const { stdout } = await execFileAsync("python", [
+        const { stdout } = await runPython([
           "-c",
-          `import sys,winrm; s=winrm.Session(sys.argv[1],auth=('Administrator',sys.argv[2]),transport='ntlm'); r=s.run_cmd('hostname'); print(r.std_out.decode().strip())`,
-          vmIp,
-          vmPass,
-        ], { timeout: 60_000 });
+          `import os,winrm; s=winrm.Session(os.environ['VM_IP'],auth=('Administrator',os.environ['VM_PASS']),transport='ntlm'); r=s.run_cmd('hostname'); print(r.std_out.decode().strip())`,
+        ], { VM_IP: vmIp, VM_PASS: vmPass }, 60_000);
         if (stdout.trim()) {
           console.log(`[Provisioner] WinRM ready on ${vmIp}, hostname: ${stdout.trim()}`);
           winrmReady = true;
