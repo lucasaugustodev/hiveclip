@@ -18,53 +18,49 @@ if "Running" in status:
     print("TightVNC already running!")
     sys.exit(0)
 
-# Step 1: Download using certutil (much faster than Invoke-WebRequest)
-print("Downloading TightVNC MSI via certutil...")
-r = s.run_cmd(
-    'certutil -urlcache -split -f '
-    '"https://www.tightvnc.com/download/2.8.84/tightvnc-2.8.84-gpl-setup-64bit.msi" '
-    '"%TEMP%\\tightvnc.msi"'
-)
-dl_out = r.std_out.decode().strip()
-print(f"Download output (last 200): {dl_out[-200:]}")
-print(f"Download RC: {r.status_code}")
+# All-in-one PowerShell script: download + install + configure
+print("Running install script (download + install + firewall)...")
+script = r"""
+$ErrorActionPreference = 'Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-if r.status_code != 0:
-    # Fallback: try bitsadmin
-    print("certutil failed, trying bitsadmin...")
-    r = s.run_cmd(
-        'bitsadmin /transfer vnc '
-        '"https://www.tightvnc.com/download/2.8.84/tightvnc-2.8.84-gpl-setup-64bit.msi" '
-        '"%TEMP%\\tightvnc.msi"'
-    )
-    print(f"Bitsadmin RC: {r.status_code}")
-    print(r.std_out.decode()[-200:])
+$installer = "$env:TEMP\tightvnc.msi"
+$url = "https://www.tightvnc.com/download/2.8.84/tightvnc-2.8.84-gpl-setup-64bit.msi"
 
-# Step 2: Install MSI via msiexec (cmd, not PowerShell)
-print("Installing TightVNC...")
-r = s.run_cmd(
-    'msiexec /i "%TEMP%\\tightvnc.msi" /quiet /norestart '
-    'ADDLOCAL=Server '
-    'SET_USEVNCAUTHENTICATION=1 VALUE_OF_USEVNCAUTHENTICATION=1 '
-    'SET_PASSWORD=1 VALUE_OF_PASSWORD=hiveclip123 '
-    'SET_USECONTROLAUTHENTICATION=1 VALUE_OF_USECONTROLAUTHENTICATION=1 '
-    'SET_CONTROLPASSWORD=1 VALUE_OF_CONTROLPASSWORD=hiveclip123'
-)
-print(f"Install RC: {r.status_code}")
-print(r.std_out.decode()[:200])
+# Download using WebClient (faster than Invoke-WebRequest, no progress bar overhead)
+Write-Host "Downloading..."
+$wc = New-Object System.Net.WebClient
+$wc.DownloadFile($url, $installer)
+Write-Host "Downloaded to $installer"
 
-# Step 3: Firewall rule
-print("Adding firewall rule...")
-r = s.run_cmd('netsh advfirewall firewall add rule name="VNC-5900" dir=in action=allow protocol=TCP localport=5900')
-print(f"Firewall RC: {r.status_code}")
+# Install silently
+Write-Host "Installing..."
+$args = "/i `"$installer`" /quiet /norestart ADDLOCAL=Server SET_USEVNCAUTHENTICATION=1 VALUE_OF_USEVNCAUTHENTICATION=1 SET_PASSWORD=1 VALUE_OF_PASSWORD=hiveclip123 SET_USECONTROLAUTHENTICATION=1 VALUE_OF_USECONTROLAUTHENTICATION=1 SET_CONTROLPASSWORD=1 VALUE_OF_CONTROLPASSWORD=hiveclip123"
+Start-Process msiexec.exe -ArgumentList $args -Wait -NoNewWindow
+Write-Host "Installed"
 
-# Step 4: Start service
-print("Starting TightVNC service...")
-r = s.run_cmd('net start tvnserver')
-print(f"Start RC: {r.status_code}")
-print(r.std_out.decode()[:100])
+# Firewall
+New-NetFirewallRule -DisplayName "VNC-5900" -Direction Inbound -Protocol TCP -LocalPort 5900 -Action Allow -ErrorAction SilentlyContinue
+Write-Host "Firewall rule added"
 
-# Step 5: Verify
+# Start service
+Start-Sleep -Seconds 3
+Start-Service tvnserver -ErrorAction SilentlyContinue
+$svc = Get-Service tvnserver -ErrorAction SilentlyContinue
+Write-Host "Service: $($svc.Status)"
+"""
+
+r = s.run_ps(script)
+print("Output:", r.std_out.decode())
+if r.std_err:
+    stderr = r.std_err.decode()
+    if "CLIXML" not in stderr:
+        print("Errors:", stderr[:500])
+print("RC:", r.status_code)
+
+# Final check
 r = s.run_ps("Get-Service tvnserver -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Status")
-final_status = r.std_out.decode().strip()
-print(f"Final TightVNC status: {final_status or 'NOT FOUND'}")
+final = r.std_out.decode().strip()
+print(f"Final status: {final or 'NOT FOUND'}")
+if final != "Running":
+    sys.exit(1)
