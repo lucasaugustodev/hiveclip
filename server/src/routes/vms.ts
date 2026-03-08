@@ -136,6 +136,21 @@ export function createVmsRouter(db: Db, provisioner: Provisioner) {
     }
   });
 
+  // Re-trigger provisioning (install VNC) on an existing VM
+  router.post("/boards/:boardId/vm/reprovision", requireAuth, async (req, res) => {
+    const [vm] = await db.select().from(vms).where(eq(vms.boardId, req.params.boardId as string)).limit(1);
+    if (!vm?.vultrInstanceId) {
+      res.status(404).json({ error: "No VM for this board" });
+      return;
+    }
+    provisioner.enqueue({
+      vmId: vm.id,
+      boardId: req.params.boardId as string,
+      vultrInstanceId: vm.vultrInstanceId,
+    });
+    res.json({ message: "Re-provisioning started", vmId: vm.id });
+  });
+
   // Dev-only: link an existing Vultr VM to a board
   router.post("/boards/:boardId/vm/link", requireAuth, async (req, res) => {
     const { boardId } = req.params;
