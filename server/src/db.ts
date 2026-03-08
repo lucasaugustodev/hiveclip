@@ -20,7 +20,11 @@ export async function startDb() {
     persistent: true,
   });
 
-  await pg.initialise();
+  try {
+    await pg.initialise();
+  } catch {
+    // Data dir already exists, that's fine
+  }
   await pg.start();
 
   const connectionString = `postgresql://hiveclip:hiveclip@localhost:5488/postgres`;
