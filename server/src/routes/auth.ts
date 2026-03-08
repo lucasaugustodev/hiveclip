@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { loginSchema, registerSchema } from "@hiveclip/shared";
-import { users } from "@hiveclip/db/src/schema/index.js";
+import { users } from "@hiveclip/db";
 import { signToken, requireAuth } from "../middleware/auth.js";
 import type { Db } from "../app.js";
 
