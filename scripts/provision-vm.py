@@ -252,7 +252,7 @@ if r.status_code != 0:
         print("  WARNING: GitHub CLI download failed")
 
 # --- Gemini CLI ---
-install_npm_global('@anthropic-ai/gemini-cli', 'gemini', 'Gemini CLI')
+install_npm_global('@google/gemini-cli', 'gemini', 'Gemini CLI')
 
 # --- Cline CLI ---
 install_npm_global('cline', 'cline', 'Cline CLI')
