@@ -140,7 +140,7 @@ export function startProvisioningWorker(db: Db) {
         console.warn(`[Provisioner] Install stderr:`, stderr.slice(-300));
       }
     } catch (err: any) {
-      console.error(`[Provisioner] Software install failed:`, err.message);
+      console.error(`[Provisioner] Software install failed:`, err.message?.slice(0, 2000));
       await updateVmStatus(vmId, "error", 6);
       return;
     }
