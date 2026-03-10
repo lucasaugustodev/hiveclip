@@ -12,23 +12,30 @@ let pg: EmbeddedPostgres | null = null;
 let sql: ReturnType<typeof postgres> | null = null;
 
 export async function startDb() {
-  pg = new EmbeddedPostgres({
-    databaseDir: DATA_DIR,
-    user: "hiveclip",
-    password: "hiveclip",
-    port: 5488,
-    persistent: true,
-  });
+  const externalUrl = process.env.DATABASE_URL;
 
-  try {
-    await pg.initialise();
-  } catch {
-    // Data dir already exists, that's fine
+  if (externalUrl) {
+    // Use external PostgreSQL (Docker, local install, etc.)
+    sql = postgres(externalUrl);
+  } else {
+    // Use embedded PostgreSQL
+    pg = new EmbeddedPostgres({
+      databaseDir: DATA_DIR,
+      user: "hiveclip",
+      password: "hiveclip",
+      port: 5488,
+      persistent: true,
+    });
+
+    try {
+      await pg.initialise();
+    } catch {
+      // Data dir already exists, that's fine
+    }
+    await pg.start();
+
+    sql = postgres("postgresql://hiveclip:hiveclip@localhost:5488/postgres");
   }
-  await pg.start();
-
-  const connectionString = `postgresql://hiveclip:hiveclip@localhost:5488/postgres`;
-  sql = postgres(connectionString);
   const db = drizzle(sql, { schema });
 
   // Create tables if they don't exist
