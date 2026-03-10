@@ -75,15 +75,15 @@ export function LauncherPage() {
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center space-y-3">
               <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-              <p className="font-medium">VM is still provisioning...</p>
-              <p className="text-xs">Claude Launcher will be available once setup completes</p>
+              <p className="font-medium">A VM ainda esta sendo provisionada...</p>
+              <p className="text-xs">O Claude Launcher estara disponivel quando a configuracao terminar</p>
             </div>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center space-y-2">
               <Terminal className="h-12 w-12 mx-auto opacity-30" />
-              <p>No VM provisioned. Go to the dashboard to provision one first.</p>
+              <p>Nenhuma VM provisionada. Va ao painel para provisionar uma primeiro.</p>
             </div>
           </div>
         )}

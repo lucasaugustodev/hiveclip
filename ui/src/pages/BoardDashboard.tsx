@@ -41,8 +41,8 @@ export function BoardDashboard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vm", boardId] }),
   });
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">Loading board...</div>;
-  if (!board) return <div className="p-6 text-destructive">Board not found</div>;
+  if (isLoading) return <div className="p-6 text-muted-foreground">Carregando board...</div>;
+  if (!board) return <div className="p-6 text-destructive">Board nao encontrado</div>;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -64,42 +64,42 @@ export function BoardDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Server className="h-4 w-4" />
-              VM Controls
+              Controles da VM
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {!vm ? (
               <Button onClick={() => provision.mutate()} disabled={provision.isPending} className="w-full">
-                {provision.isPending ? "Provisioning..." : "Provision VM"}
+                {provision.isPending ? "Provisionando..." : "Provisionar VM"}
               </Button>
             ) : (
               <div className="flex gap-2">
                 <Button onClick={() => start.mutate()} disabled={start.isPending || vm.powerStatus === "running"} variant="outline" className="flex-1">
-                  <Play className="mr-2 h-4 w-4" />Start
+                  <Play className="mr-2 h-4 w-4" />Iniciar
                 </Button>
                 <Button onClick={() => stop.mutate()} disabled={stop.isPending || vm.powerStatus === "stopped"} variant="outline" className="flex-1">
-                  <Square className="mr-2 h-4 w-4" />Stop
+                  <Square className="mr-2 h-4 w-4" />Parar
                 </Button>
               </div>
             )}
             {vm && (
               <div className="text-xs text-muted-foreground space-y-1">
-                <p>Region: {vm.region}</p>
-                <p>Plan: {vm.plan}</p>
-                <p>IP: {vm.ipAddress || "Pending..."}</p>
-                <p>Power: {vm.powerStatus || "unknown"}</p>
-                <p>Server: {vm.serverStatus || "unknown"}</p>
-                <p>Vultr: {vm.vultrStatus || "unknown"}</p>
+                <p>Regiao: {vm.region}</p>
+                <p>Plano: {vm.plan}</p>
+                <p>IP: {vm.ipAddress || "Pendente..."}</p>
+                <p>Energia: {vm.powerStatus || "desconhecido"}</p>
+                <p>Servidor: {vm.serverStatus || "desconhecido"}</p>
+                <p>Vultr: {vm.vultrStatus || "desconhecido"}</p>
                 {vm.vncHealthy && <p>VNC: port {vm.vncPort || 5900}</p>}
                 {vm.provisioningStep && vm.provisioningStep !== "ready" && vm.provisioningStep !== "error" && (
                   <div className="mt-2 space-y-1 p-2 rounded bg-muted/50 border border-border">
                     <p className="text-xs font-medium text-primary">
-                      {vm.provisioningStep === "wait_boot" && "Waiting for VM to boot..."}
-                      {vm.provisioningStep === "wait_winrm" && "Waiting for remote management..."}
-                      {vm.provisioningStep === "install_software" && "Installing software (VNC, Launcher, CLIs)..."}
-                      {vm.provisioningStep === "install_vnc" && "Installing VNC server..."}
-                      {vm.provisioningStep === "health_check" && "Verifying VNC connection..."}
-                      {!["wait_boot", "wait_winrm", "install_software", "install_vnc", "health_check"].includes(vm.provisioningStep) && `Step: ${vm.provisioningStep}`}
+                      {vm.provisioningStep === "wait_boot" && "Aguardando a VM iniciar..."}
+                      {vm.provisioningStep === "wait_winrm" && "Aguardando gerenciamento remoto..."}
+                      {vm.provisioningStep === "install_software" && "Instalando software (VNC, Launcher, CLIs)..."}
+                      {vm.provisioningStep === "install_vnc" && "Instalando servidor VNC..."}
+                      {vm.provisioningStep === "health_check" && "Verificando conexao VNC..."}
+                      {!["wait_boot", "wait_winrm", "install_software", "install_vnc", "health_check"].includes(vm.provisioningStep) && `Etapa: ${vm.provisioningStep}`}
                     </p>
                     <div className="w-full bg-muted rounded-full h-1.5">
                       <div
@@ -107,30 +107,30 @@ export function BoardDashboard() {
                         style={{ width: `${((vm.provisioningProgress || 0) / 12) * 100}%` }}
                       />
                     </div>
-                    <p className="text-[10px] text-muted-foreground">Step {vm.provisioningProgress || 0} of 12</p>
+                    <p className="text-[10px] text-muted-foreground">Etapa {vm.provisioningProgress || 0} de 12</p>
                   </div>
                 )}
                 {vm.provisioningStep === "ready" && (
-                  <p className="text-xs font-medium text-green-500 mt-1">VNC ready</p>
+                  <p className="text-xs font-medium text-green-500 mt-1">VNC pronto</p>
                 )}
                 {vm.provisioningStep === "error" && (
                   <div className="mt-2 space-y-1">
-                    <p className="text-xs font-medium text-destructive">Provisioning error</p>
+                    <p className="text-xs font-medium text-destructive">Erro no provisionamento</p>
                     <Button size="sm" variant="outline" onClick={() => reprovision.mutate()} disabled={reprovision.isPending} className="text-xs h-7">
-                      {reprovision.isPending ? "Retrying..." : "Retry Setup"}
+                      {reprovision.isPending ? "Tentando novamente..." : "Tentar novamente"}
                     </Button>
                   </div>
                 )}
                 {!vm.provisioningStep && vm.ipAddress && vm.powerStatus === "running" && !vm.vncHealthy && (
                   <div className="mt-2 space-y-1">
-                    <p className="text-xs text-muted-foreground">VNC not installed yet</p>
+                    <p className="text-xs text-muted-foreground">VNC ainda nao instalado</p>
                     <Button size="sm" variant="outline" onClick={() => reprovision.mutate()} disabled={reprovision.isPending} className="text-xs h-7">
-                      {reprovision.isPending ? "Installing..." : "Install VNC"}
+                      {reprovision.isPending ? "Instalando..." : "Instalar VNC"}
                     </Button>
                   </div>
                 )}
                 {!vm.provisioningStep && vm.ipAddress && vm.powerStatus === "running" && vm.vncHealthy && (
-                  <p className="text-xs font-medium text-green-500 mt-1">VNC ready</p>
+                  <p className="text-xs font-medium text-green-500 mt-1">VNC pronto</p>
                 )}
               </div>
             )}
@@ -141,18 +141,18 @@ export function BoardDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Monitor className="h-4 w-4" />
-              Desktop Access
+              Acesso ao Desktop
             </CardTitle>
           </CardHeader>
           <CardContent>
             {vm?.powerStatus === "running" ? (
               <Link to={`/boards/${boardId}/desktop`}>
                 <Button className="w-full">
-                  <Monitor className="mr-2 h-4 w-4" />Open Desktop
+                  <Monitor className="mr-2 h-4 w-4" />Abrir Desktop
                 </Button>
               </Link>
             ) : (
-              <p className="text-sm text-muted-foreground">VM must be running to access desktop.</p>
+              <p className="text-sm text-muted-foreground">A VM precisa estar ligada para acessar o desktop.</p>
             )}
           </CardContent>
         </Card>
@@ -167,11 +167,11 @@ export function BoardDashboard() {
             {vm?.powerStatus === "running" ? (
               <Link to={`/boards/${boardId}/launcher`}>
                 <Button className="w-full" variant="outline">
-                  <Terminal className="mr-2 h-4 w-4" />Open Launcher
+                  <Terminal className="mr-2 h-4 w-4" />Abrir Launcher
                 </Button>
               </Link>
             ) : (
-              <p className="text-sm text-muted-foreground">VM must be running to access Claude Launcher.</p>
+              <p className="text-sm text-muted-foreground">A VM precisa estar ligada para acessar o Claude Launcher.</p>
             )}
           </CardContent>
         </Card>

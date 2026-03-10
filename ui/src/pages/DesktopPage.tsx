@@ -42,14 +42,14 @@ export function DesktopPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <span className="text-sm font-medium">{board?.name} — Desktop</span>
+        <span className="text-sm font-medium">{board?.name} — Area de Trabalho</span>
         {vm?.ipAddress && (
           <span className="text-xs text-muted-foreground ml-2">{vm.ipAddress}</span>
         )}
         <div className="ml-auto flex items-center gap-2">
           {vm?.adminPassword && (
             <span className="text-xs text-muted-foreground">
-              Pass: <code className="bg-muted px-1 rounded">{vm.adminPassword}</code>
+              Senha: <code className="bg-muted px-1 rounded">{vm.adminPassword}</code>
             </span>
           )}
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleFullscreen}>
@@ -65,11 +65,11 @@ export function DesktopPage() {
             <div className="text-center space-y-3">
               <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
               <p className="font-medium">
-                {vm.provisioningStep === "wait_boot" && "Waiting for VM to boot..."}
-                {vm.provisioningStep === "wait_winrm" && "Connecting to remote management..."}
-                {vm.provisioningStep === "install_vnc" && "Installing VNC server..."}
-                {vm.provisioningStep === "health_check" && "Verifying VNC connection..."}
-                {!["wait_boot", "wait_winrm", "install_vnc", "health_check", "ready"].includes(vm.provisioningStep) && `Provisioning: ${vm.provisioningStep}`}
+                {vm.provisioningStep === "wait_boot" && "Aguardando a VM iniciar..."}
+                {vm.provisioningStep === "wait_winrm" && "Conectando ao gerenciamento remoto..."}
+                {vm.provisioningStep === "install_vnc" && "Instalando servidor VNC..."}
+                {vm.provisioningStep === "health_check" && "Verificando conexao VNC..."}
+                {!["wait_boot", "wait_winrm", "install_vnc", "health_check", "ready"].includes(vm.provisioningStep) && `Provisionando: ${vm.provisioningStep}`}
               </p>
               <div className="w-48 bg-muted rounded-full h-2 mx-auto">
                 <div
@@ -77,18 +77,18 @@ export function DesktopPage() {
                   style={{ width: `${((vm.provisioningProgress || 0) / 12) * 100}%` }}
                 />
               </div>
-              <p className="text-xs">This can take 5-10 minutes for Windows VMs</p>
+              <p className="text-xs">Isso pode levar de 5 a 10 minutos para VMs Windows</p>
             </div>
           </div>
         ) : vm?.provisioningStep === "error" ? (
           <div className="flex-1 flex items-center justify-center text-destructive">
-            <p>Provisioning failed. Check server logs for details.</p>
+            <p>Falha no provisionamento. Verifique os logs do servidor.</p>
           </div>
         ) : vm?.ipAddress && vm.ipAddress !== "0.0.0.0" ? (
           <VncViewer ip={vm.ipAddress} password="hiveclip123" />
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <p>No VM provisioned. Go to the dashboard to provision one first.</p>
+            <p>Nenhuma VM provisionada. Va ao painel para provisionar uma primeiro.</p>
           </div>
         )}
       </div>

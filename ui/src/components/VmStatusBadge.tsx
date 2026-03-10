@@ -1,10 +1,10 @@
 import { Badge } from "./ui/badge";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  provisioning: { label: "Provisioning", variant: "outline" },
-  running: { label: "Running", variant: "default" },
-  stopped: { label: "Stopped", variant: "secondary" },
-  error: { label: "Error", variant: "destructive" },
+  provisioning: { label: "Provisionando", variant: "outline" },
+  running: { label: "Rodando", variant: "default" },
+  stopped: { label: "Parada", variant: "secondary" },
+  error: { label: "Erro", variant: "destructive" },
 };
 
 export function VmStatusBadge({ status }: { status: string }) {

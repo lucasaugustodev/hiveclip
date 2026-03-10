@@ -7,23 +7,23 @@ export function SettingsPage() {
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      <h1 className="text-2xl font-bold mb-6">Configuracoes</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Account</CardTitle>
+          <CardTitle className="text-base">Conta</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Email</span>
+            <span className="text-sm text-muted-foreground">E-mail</span>
             <span className="text-sm">{user?.email}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Display Name</span>
+            <span className="text-sm text-muted-foreground">Nome</span>
             <span className="text-sm">{user?.displayName || "—"}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Role</span>
+            <span className="text-sm text-muted-foreground">Funcao</span>
             <Badge variant="secondary">{user?.role}</Badge>
           </div>
         </CardContent>
