@@ -257,6 +257,21 @@ install_npm_global('@google/gemini-cli', 'gemini', 'Gemini CLI')
 # --- Cline CLI ---
 install_npm_global('cline', 'cline', 'Cline CLI')
 
+# --- Google Workspace CLI ---
+install_npm_global('@googleworkspace/cli', 'gws', 'Google Workspace CLI')
+
+# --- Playwright CLI ---
+print("Installing Playwright CLI...")
+r = run_cmd('npx playwright --version', "Check playwright")
+if r.status_code != 0:
+    run_cmd('npm install -g playwright', "npm install playwright")
+    run_cmd('npx playwright install chromium', "Playwright install chromium")
+    run_cmd('npx playwright --version', "Playwright CLI")
+else:
+    print("  Playwright already installed")
+    # Ensure at least chromium is installed
+    run_cmd('npx playwright install chromium', "Playwright ensure chromium")
+
 # --- Verify all ---
 print("\nVerifying installations...")
 run_cmd('node --version', "Node.js")
@@ -265,8 +280,10 @@ run_cmd('claude --version', "Claude Code")
 run_cmd('gh --version', "GitHub CLI")
 run_cmd('gemini --version', "Gemini CLI")
 run_cmd('cline --version', "Cline CLI")
+run_cmd('gws --version', "Google Workspace CLI")
+run_cmd('npx playwright --version', "Playwright CLI")
 
 print("\n=== Provisioning complete ===")
 print(f"  VNC: {ip}:5900 (password: hiveclip123)")
 print(f"  Launcher: {ip}:3001")
-print(f"  CLIs: claude, gh, gemini, cline")
+print(f"  CLIs: claude, gh, gemini, cline, gws, playwright")
