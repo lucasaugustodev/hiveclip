@@ -140,41 +140,7 @@ else:
 r = s.run_cmd('netsh advfirewall firewall add rule name=ClaudeLauncher-3001 dir=in action=allow protocol=TCP localport=3001')
 print(f"Firewall port 3001: RC={r.status_code}")
 
-# Build start.bat with full PATH so SYSTEM user can find all CLIs
-print("Creating launcher start script with full PATH...")
-r = s.run_ps('[Environment]::GetEnvironmentVariable("Path","Machine")')
-sys_path = r.std_out.decode().strip()
-npm_bin = r"C:\Users\Administrator\AppData\Roaming\npm"
-if npm_bin.lower() not in sys_path.lower():
-    sys_path = sys_path.rstrip(";") + ";" + npm_bin
-
-bat_content = f"@echo off\nset PATH={sys_path};%PATH%\nset PORT=3001\ncd /d C:\\claude-launcher-web\nnode server.js\n"
-escaped_bat = bat_content.replace("'", "''")
-r = s.run_ps(f"Set-Content -Path 'C:\\claude-launcher-web\\start.bat' -Value '{escaped_bat}' -Encoding ASCII")
-print(f"  Write start.bat: RC={r.status_code}")
-
-# Create a scheduled task to auto-start claude-launcher-web
-print("Creating auto-start task...")
-s.run_cmd('schtasks /delete /tn "ClaudeLauncherWeb" /f')
-r = s.run_cmd(
-    'schtasks /create /tn "ClaudeLauncherWeb" /tr '
-    '"cmd /c C:\\claude-launcher-web\\start.bat" '
-    '/sc onstart /ru SYSTEM /rl HIGHEST /f'
-)
-print(f"  Task create RC: {r.status_code}")
-
-# Start it now (kill any existing instance first)
-print("Starting claude-launcher-web...")
-s.run_cmd('taskkill /f /im node.exe 2>nul')
-time.sleep(2)
-r = s.run_cmd(r'schtasks /run /tn "ClaudeLauncherWeb"')
-print(f"  Task run RC: {r.status_code}")
-
-# Wait and check if port 3001 is listening
-time.sleep(5)
-r = s.run_cmd('powershell -c "Test-NetConnection -ComputerName localhost -Port 3001 | Select-Object -ExpandProperty TcpTestSucceeded"')
-port_ok = r.std_out.decode().strip()
-print(f"Port 3001 listening: {port_ok}")
+# NOTE: start.bat creation moved to after CLI installs so PATH includes all tools
 
 # ========== STEP 3: Install Dev CLIs ==========
 print("\n=== Step 3: Dev CLIs ===")
