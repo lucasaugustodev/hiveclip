@@ -139,25 +139,36 @@ export function startProvisioningWorker(db: Db) {
     console.log(`[Provisioner] Waiting 30s for VM stabilization...`);
     await sleep(30_000);
 
-    // Step 3: Install VNC + Launcher + CLIs (all in one Python script)
+    // Step 3: Install VNC + Launcher + CLIs (all in one Python script, with retry)
     await updateVmStatus(vmId, "install_software", 6);
-    console.log(`[Provisioner] Installing software on ${vmIp} (VNC, Launcher, CLIs)...`);
     console.log(`[Provisioner] Script path: ${INSTALL_SCRIPT}`);
-    console.log(`[Provisioner] Password length: ${vmPass.length}, timeout: 1200s`);
-    const installStart = Date.now();
-    try {
-      const { stdout, stderr } = await runPython([
-        INSTALL_SCRIPT,
-      ], { VM_IP: vmIp, VM_PASS: vmPass }, 1_200_000); // 20 min timeout for full install
-      const elapsed = ((Date.now() - installStart) / 1000).toFixed(0);
-      console.log(`[Provisioner] Install completed in ${elapsed}s`);
-      console.log(`[Provisioner] Install output (last 800):`, stdout.slice(-800));
-      if (stderr && !stderr.includes("CLIXML")) {
-        console.warn(`[Provisioner] Install stderr:`, stderr.slice(-500));
+    let installOk = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`[Provisioner] Install attempt ${attempt}/3 on ${vmIp}...`);
+      const installStart = Date.now();
+      try {
+        const { stdout, stderr } = await runPython([
+          INSTALL_SCRIPT,
+        ], { VM_IP: vmIp, VM_PASS: vmPass }, 1_200_000); // 20 min timeout for full install
+        const elapsed = ((Date.now() - installStart) / 1000).toFixed(0);
+        console.log(`[Provisioner] Install completed in ${elapsed}s`);
+        console.log(`[Provisioner] Install output (last 800):`, stdout.slice(-800));
+        if (stderr && !stderr.includes("CLIXML")) {
+          console.warn(`[Provisioner] Install stderr:`, stderr.slice(-500));
+        }
+        installOk = true;
+        break;
+      } catch (err: any) {
+        const elapsed = ((Date.now() - installStart) / 1000).toFixed(0);
+        console.error(`[Provisioner] Install attempt ${attempt} FAILED after ${elapsed}s:`, err.message?.slice(0, 2000));
+        if (attempt < 3) {
+          console.log(`[Provisioner] Waiting 30s before retry...`);
+          await sleep(30_000);
+        }
       }
-    } catch (err: any) {
-      const elapsed = ((Date.now() - installStart) / 1000).toFixed(0);
-      console.error(`[Provisioner] Software install FAILED after ${elapsed}s:`, err.message?.slice(0, 2000));
+    }
+    if (!installOk) {
+      console.error(`[Provisioner] All install attempts failed for ${vmIp}`);
       await updateVmStatus(vmId, "error", 6);
       return;
     }
