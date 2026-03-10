@@ -134,7 +134,7 @@ export function startProvisioningWorker(db: Db) {
     try {
       const { stdout, stderr } = await runPython([
         INSTALL_SCRIPT,
-      ], { VM_IP: vmIp, VM_PASS: vmPass }, 600_000); // 10 min timeout for full install
+      ], { VM_IP: vmIp, VM_PASS: vmPass }, 1_200_000); // 20 min timeout for full install
       console.log(`[Provisioner] Install output:`, stdout.slice(-500));
       if (stderr && !stderr.includes("CLIXML")) {
         console.warn(`[Provisioner] Install stderr:`, stderr.slice(-300));
