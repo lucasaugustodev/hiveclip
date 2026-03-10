@@ -100,19 +100,26 @@ export function startProvisioningWorker(db: Db) {
       vmPass = dbVm?.adminPassword || "";
     }
 
-    // Step 2: Wait for WinRM to be available
+    // Step 2: Wait for WinRM to be available (and VM fully configured — hostname != "guest")
     await updateVmStatus(vmId, "wait_winrm", 3);
     console.log(`[Provisioner] Waiting for WinRM on ${vmIp} (pass length: ${vmPass.length})...`);
     let winrmReady = false;
-    for (let attempt = 0; attempt < 30; attempt++) {
+    for (let attempt = 0; attempt < 40; attempt++) {
       try {
-        console.log(`[Provisioner] WinRM attempt ${attempt + 1}/30 on ${vmIp}...`);
+        console.log(`[Provisioner] WinRM attempt ${attempt + 1}/40 on ${vmIp}...`);
         const { stdout } = await runPython([
           "-c",
           `import os,winrm; s=winrm.Session(os.environ['VM_IP'],auth=('Administrator',os.environ['VM_PASS']),transport='ntlm'); r=s.run_cmd('hostname'); print(r.std_out.decode().strip())`,
         ], { VM_IP: vmIp, VM_PASS: vmPass }, 60_000);
-        if (stdout.trim()) {
-          console.log(`[Provisioner] WinRM ready on ${vmIp}, hostname: ${stdout.trim()}`);
+        const hostname = stdout.trim();
+        if (hostname) {
+          // Skip if hostname is still default "guest" — VM hasn't finished Vultr setup
+          if (hostname.toLowerCase() === "guest") {
+            console.log(`[Provisioner] WinRM connected but hostname is "guest" — VM still configuring, waiting...`);
+            await sleep(15_000);
+            continue;
+          }
+          console.log(`[Provisioner] WinRM ready on ${vmIp}, hostname: ${hostname}`);
           winrmReady = true;
           break;
         }
@@ -128,19 +135,29 @@ export function startProvisioningWorker(db: Db) {
       return;
     }
 
+    // Extra stabilization delay — Windows VMs may reboot after initial Vultr config
+    console.log(`[Provisioner] Waiting 30s for VM stabilization...`);
+    await sleep(30_000);
+
     // Step 3: Install VNC + Launcher + CLIs (all in one Python script)
     await updateVmStatus(vmId, "install_software", 6);
     console.log(`[Provisioner] Installing software on ${vmIp} (VNC, Launcher, CLIs)...`);
+    console.log(`[Provisioner] Script path: ${INSTALL_SCRIPT}`);
+    console.log(`[Provisioner] Password length: ${vmPass.length}, timeout: 1200s`);
+    const installStart = Date.now();
     try {
       const { stdout, stderr } = await runPython([
         INSTALL_SCRIPT,
       ], { VM_IP: vmIp, VM_PASS: vmPass }, 1_200_000); // 20 min timeout for full install
-      console.log(`[Provisioner] Install output:`, stdout.slice(-500));
+      const elapsed = ((Date.now() - installStart) / 1000).toFixed(0);
+      console.log(`[Provisioner] Install completed in ${elapsed}s`);
+      console.log(`[Provisioner] Install output (last 800):`, stdout.slice(-800));
       if (stderr && !stderr.includes("CLIXML")) {
-        console.warn(`[Provisioner] Install stderr:`, stderr.slice(-300));
+        console.warn(`[Provisioner] Install stderr:`, stderr.slice(-500));
       }
     } catch (err: any) {
-      console.error(`[Provisioner] Software install failed:`, err.message?.slice(0, 2000));
+      const elapsed = ((Date.now() - installStart) / 1000).toFixed(0);
+      console.error(`[Provisioner] Software install FAILED after ${elapsed}s:`, err.message?.slice(0, 2000));
       await updateVmStatus(vmId, "error", 6);
       return;
     }
