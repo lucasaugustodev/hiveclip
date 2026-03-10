@@ -10,3 +10,6 @@ data/
 .pgdata/
 test-results/
 playwright-report/
+.playwright-cli/
+======= REPLACE
+
