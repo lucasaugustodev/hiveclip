@@ -238,6 +238,47 @@ else:
     # Ensure at least chromium is installed
     run_cmd('npx playwright install chromium', "Playwright ensure chromium")
 
+# ========== STEP 4: Start claude-launcher-web with full PATH ==========
+print("\n=== Step 4: Start Launcher ===")
+
+# Re-read system PATH now that all CLIs are installed (gh MSI adds to PATH)
+print("Building start.bat with full PATH (after all CLI installs)...")
+r = s.run_ps('[Environment]::GetEnvironmentVariable("Path","Machine")')
+sys_path = r.std_out.decode().strip()
+npm_bin = r"C:\Users\Administrator\AppData\Roaming\npm"
+gh_dir = r"C:\Program Files\GitHub CLI"
+for extra in [npm_bin, gh_dir]:
+    if extra.lower() not in sys_path.lower():
+        sys_path = sys_path.rstrip(";") + ";" + extra
+
+bat_content = f"@echo off\nset PATH={sys_path};%PATH%\nset PORT=3001\ncd /d C:\\claude-launcher-web\nnode server.js\n"
+escaped_bat = bat_content.replace("'", "''")
+r = s.run_ps(f"Set-Content -Path 'C:\\claude-launcher-web\\start.bat' -Value '{escaped_bat}' -Encoding ASCII")
+print(f"  Write start.bat: RC={r.status_code}")
+
+# Create a scheduled task to auto-start claude-launcher-web
+print("Creating auto-start task...")
+s.run_cmd('schtasks /delete /tn "ClaudeLauncherWeb" /f')
+r = s.run_cmd(
+    'schtasks /create /tn "ClaudeLauncherWeb" /tr '
+    '"cmd /c C:\\claude-launcher-web\\start.bat" '
+    '/sc onstart /ru SYSTEM /rl HIGHEST /f'
+)
+print(f"  Task create RC: {r.status_code}")
+
+# Start it now (kill any existing instance first)
+print("Starting claude-launcher-web...")
+s.run_cmd('taskkill /f /im node.exe 2>nul')
+time.sleep(2)
+r = s.run_cmd(r'schtasks /run /tn "ClaudeLauncherWeb"')
+print(f"  Task run RC: {r.status_code}")
+
+# Wait and check if port 3001 is listening
+time.sleep(5)
+r = s.run_cmd('powershell -c "Test-NetConnection -ComputerName localhost -Port 3001 | Select-Object -ExpandProperty TcpTestSucceeded"')
+port_ok = r.std_out.decode().strip()
+print(f"Port 3001 listening: {port_ok}")
+
 # --- Verify all ---
 print("\nVerifying installations...")
 run_cmd('node --version', "Node.js")
