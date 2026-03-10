@@ -36,7 +36,7 @@ export function LoginPage() {
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pb-4">
             {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
