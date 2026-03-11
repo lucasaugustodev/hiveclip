@@ -1,9 +1,8 @@
 import type { Server as HttpServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { Socket } from "node:net";
-import jwt from "jsonwebtoken";
+import { supabase } from "./supabase.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "hiveclip-dev-secret";
 const VNC_PORT = 5900;
 
 export function setupVncProxy(server: HttpServer) {
@@ -23,18 +22,18 @@ export function setupVncProxy(server: HttpServer) {
       return;
     }
 
-    try {
-      jwt.verify(token, JWT_SECRET);
-    } catch {
-      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-      socket.destroy();
-      return;
-    }
+    supabase.auth.getUser(token).then(({ error }) => {
+      if (error) {
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        socket.destroy();
+        return;
+      }
 
-    const vmIp = match[1];
+      const vmIp = match[1];
 
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit("connection", ws, req, vmIp);
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit("connection", ws, req, vmIp);
+      });
     });
   });
 

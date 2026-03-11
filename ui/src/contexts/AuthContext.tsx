@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { supabase } from "../lib/supabase";
 import { api } from "../api/client";
-
-const TOKEN_KEY = "hiveclip.token";
 
 interface User {
   id: string;
@@ -13,7 +12,6 @@ interface User {
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
 }
 
@@ -28,38 +26,55 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
-    token: localStorage.getItem(TOKEN_KEY),
     isLoading: true,
   });
 
-  useEffect(() => {
-    if (!state.token) {
-      setState((s) => ({ ...s, isLoading: false }));
-      return;
+  const loadProfile = useCallback(async () => {
+    try {
+      const profile = await api.get<User>("/auth/me");
+      setState({ user: profile, isLoading: false });
+    } catch {
+      setState({ user: null, isLoading: false });
     }
-    api.get<User>("/auth/me")
-      .then((user) => setState({ user, token: state.token, isLoading: false }))
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        setState({ user: null, token: null, isLoading: false });
-      });
   }, []);
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        loadProfile();
+      } else {
+        setState({ user: null, isLoading: false });
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        loadProfile();
+      } else {
+        setState({ user: null, isLoading: false });
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadProfile]);
+
   const login = useCallback(async (email: string, password: string) => {
-    const res = await api.post<{ token: string; user: User }>("/auth/login", { email, password });
-    localStorage.setItem(TOKEN_KEY, res.token);
-    setState({ user: res.user, token: res.token, isLoading: false });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
   }, []);
 
   const register = useCallback(async (email: string, password: string, displayName?: string) => {
-    const res = await api.post<{ token: string; user: User }>("/auth/register", { email, password, displayName });
-    localStorage.setItem(TOKEN_KEY, res.token);
-    setState({ user: res.user, token: res.token, isLoading: false });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: displayName } },
+    });
+    if (error) throw new Error(error.message);
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    setState({ user: null, token: null, isLoading: false });
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setState({ user: null, isLoading: false });
   }, []);
 
   return (

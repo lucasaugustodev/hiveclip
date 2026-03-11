@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { boards } from "./boards.js";
-import { users } from "./users.js";
+import { profiles } from "./profiles.js";
 
 export const boardMemberships = pgTable(
   "board_memberships",
@@ -11,7 +11,7 @@ export const boardMemberships = pgTable(
       .references(() => boards.id, { onDelete: "cascade" }),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => profiles.id),
     role: text("role").default("member"),
     createdAt: timestamp("created_at").defaultNow(),
   },

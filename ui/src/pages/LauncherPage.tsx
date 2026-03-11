@@ -4,11 +4,23 @@ import { fetchBoard } from "../api/boards";
 import { fetchVm } from "../api/vms";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, Maximize2, Minimize2, Terminal } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 
 export function LauncherPage() {
   const { boardId } = useParams<{ boardId: string }>();
   const [fullscreen, setFullscreen] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setToken(session?.access_token ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setToken(session?.access_token ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const { data: board } = useQuery({
     queryKey: ["boards", boardId],
@@ -22,8 +34,6 @@ export function LauncherPage() {
     enabled: !!boardId,
     refetchInterval: 5000,
   });
-
-  const token = localStorage.getItem("hiveclip.token");
 
   // Build the proxied launcher URL
   const launcherUrl = useMemo(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 // @ts-expect-error no types for noVNC
 import RFB from "@novnc/novnc/core/rfb.js";
+import { supabase } from "../lib/supabase";
 
 interface VncViewerProps {
   ip: string;
@@ -16,56 +17,62 @@ export function VncViewer({ ip, password }: VncViewerProps) {
   useEffect(() => {
     if (!containerRef.current || !ip) return;
 
-    const token = localStorage.getItem("hiveclip.token");
-    if (!token) {
-      setStatus("error");
-      setErrorMsg("Nao autenticado");
-      return;
-    }
+    let cancelled = false;
 
-    const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${wsProto}//${window.location.host}/api/vnc/${ip}?token=${encodeURIComponent(token)}`;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
+      const token = session?.access_token;
+      if (!token) {
+        setStatus("error");
+        setErrorMsg("Nao autenticado");
+        return;
+      }
 
-    setStatus("connecting");
+      const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${wsProto}//${window.location.host}/api/vnc/${ip}?token=${encodeURIComponent(token)}`;
 
-    try {
-      const rfb = new RFB(containerRef.current, wsUrl, {
-        credentials: { password: password || "" },
-      });
+      setStatus("connecting");
 
-      rfb.scaleViewport = true;
-      rfb.resizeSession = true;
-      rfb.showDotCursor = true;
+      try {
+        const rfb = new RFB(containerRef.current, wsUrl, {
+          credentials: { password: password || "" },
+        });
 
-      rfb.addEventListener("connect", () => {
-        setStatus("connected");
-      });
+        rfb.scaleViewport = true;
+        rfb.resizeSession = true;
+        rfb.showDotCursor = true;
 
-      rfb.addEventListener("disconnect", (e: any) => {
-        if (e.detail?.clean) {
-          setStatus("disconnected");
-        } else {
-          setStatus("error");
-          setErrorMsg("Conexao perdida. O servidor VNC pode ainda nao estar rodando na VM.");
-        }
-      });
+        rfb.addEventListener("connect", () => {
+          setStatus("connected");
+        });
 
-      rfb.addEventListener("credentialsrequired", () => {
-        if (password) {
-          rfb.sendCredentials({ password });
-        } else {
-          setStatus("error");
-          setErrorMsg("Senha VNC necessaria");
-        }
-      });
+        rfb.addEventListener("disconnect", (e: any) => {
+          if (e.detail?.clean) {
+            setStatus("disconnected");
+          } else {
+            setStatus("error");
+            setErrorMsg("Conexao perdida. O servidor VNC pode ainda nao estar rodando na VM.");
+          }
+        });
 
-      rfbRef.current = rfb;
-    } catch (err: any) {
-      setStatus("error");
-      setErrorMsg(err.message || "Falha ao conectar");
-    }
+        rfb.addEventListener("credentialsrequired", () => {
+          if (password) {
+            rfb.sendCredentials({ password });
+          } else {
+            setStatus("error");
+            setErrorMsg("Senha VNC necessaria");
+          }
+        });
+
+        rfbRef.current = rfb;
+      } catch (err: any) {
+        setStatus("error");
+        setErrorMsg(err.message || "Falha ao conectar");
+      }
+    });
 
     return () => {
+      cancelled = true;
       if (rfbRef.current) {
         rfbRef.current.disconnect();
         rfbRef.current = null;
