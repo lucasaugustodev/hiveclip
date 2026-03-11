@@ -235,6 +235,67 @@ if r.status_code != 0:
 print("Installing Playwright chromium...")
 run_cmd('npx playwright install chromium', "Playwright install chromium")
 
+# --- claude-mem (memory plugin for Claude Code) ---
+print("\nInstalling claude-mem...")
+
+# Install Bun runtime (required by claude-mem)
+r = run_cmd('bun --version', "Check Bun")
+if r.status_code != 0:
+    print("  Installing Bun...")
+    r = s.run_ps('irm bun.sh/install.ps1 | iex')
+    bun_rc = r.status_code
+    bun_out = r.std_out.decode().strip()[-200:]
+    print(f"  Bun install RC: {bun_rc} - {bun_out}")
+    time.sleep(3)
+
+# Install uv (Python package manager, required by claude-mem vector search)
+r = run_cmd('uv --version', "Check uv")
+if r.status_code != 0:
+    print("  Installing uv...")
+    r = s.run_ps('irm https://astral.sh/uv/install.ps1 | iex')
+    print(f"  uv install RC: {r.status_code}")
+    time.sleep(3)
+
+# Clone claude-mem repo
+r = s.run_cmd(r'dir C:\claude-mem\package.json')
+if r.status_code != 0:
+    print("  Cloning claude-mem...")
+    r = s.run_cmd('git clone https://github.com/thedotmack/claude-mem.git C:\\claude-mem')
+    print(f"  Clone RC: {r.status_code}")
+else:
+    print("  claude-mem already cloned, pulling latest...")
+    s.run_cmd(r'cd C:\claude-mem && git pull')
+
+# Install claude-mem dependencies with Bun
+BUN_PATH = r"C:\Users\Administrator\.bun\bin"
+run_cmd(f'set PATH={BUN_PATH};%PATH% && cd /d C:\\claude-mem && bun install', "claude-mem bun install")
+
+# Set up Claude Code plugin hooks (register claude-mem as a plugin)
+CLAUDE_DIR = r"C:\Users\Administrator\.claude"
+print("  Configuring Claude Code plugin hooks...")
+plugin_config = r'''
+{
+  "plugins": {
+    "claude-mem": {
+      "root": "C:\\claude-mem",
+      "hooks": {
+        "SessionStart": "node C:\\claude-mem\\scripts\\smart-install.js && bun C:\\claude-mem\\src\\hooks\\session-start.ts",
+        "UserPromptSubmit": "bun C:\\claude-mem\\src\\hooks\\user-prompt-submit.ts",
+        "Stop": "bun C:\\claude-mem\\src\\hooks\\stop.ts"
+      }
+    }
+  }
+}
+'''.strip().replace("'", "''")
+
+r = s.run_ps(f"""
+New-Item -ItemType Directory -Force -Path '{CLAUDE_DIR}' | Out-Null
+Set-Content -Path '{CLAUDE_DIR}\\plugins.json' -Value '{plugin_config}' -Encoding UTF8
+""")
+print(f"  Plugin config RC: {r.status_code}")
+
+run_cmd(f'set PATH={BUN_PATH};%PATH% && bun --version', "Bun version")
+
 # ========== STEP 4: Start claude-launcher-web with full PATH ==========
 print("\n=== Step 4: Start Launcher ===")
 
