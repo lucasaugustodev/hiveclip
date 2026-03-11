@@ -140,41 +140,7 @@ else:
 r = s.run_cmd('netsh advfirewall firewall add rule name=ClaudeLauncher-3001 dir=in action=allow protocol=TCP localport=3001')
 print(f"Firewall port 3001: RC={r.status_code}")
 
-# Build start.bat with full PATH so SYSTEM user can find all CLIs
-print("Creating launcher start script with full PATH...")
-r = s.run_ps('[Environment]::GetEnvironmentVariable("Path","Machine")')
-sys_path = r.std_out.decode().strip()
-npm_bin = r"C:\Users\Administrator\AppData\Roaming\npm"
-if npm_bin.lower() not in sys_path.lower():
-    sys_path = sys_path.rstrip(";") + ";" + npm_bin
-
-bat_content = f"@echo off\nset PATH={sys_path};%PATH%\nset PORT=3001\ncd /d C:\\claude-launcher-web\nnode server.js\n"
-escaped_bat = bat_content.replace("'", "''")
-r = s.run_ps(f"Set-Content -Path 'C:\\claude-launcher-web\\start.bat' -Value '{escaped_bat}' -Encoding ASCII")
-print(f"  Write start.bat: RC={r.status_code}")
-
-# Create a scheduled task to auto-start claude-launcher-web
-print("Creating auto-start task...")
-s.run_cmd('schtasks /delete /tn "ClaudeLauncherWeb" /f')
-r = s.run_cmd(
-    'schtasks /create /tn "ClaudeLauncherWeb" /tr '
-    '"cmd /c C:\\claude-launcher-web\\start.bat" '
-    '/sc onstart /ru SYSTEM /rl HIGHEST /f'
-)
-print(f"  Task create RC: {r.status_code}")
-
-# Start it now (kill any existing instance first)
-print("Starting claude-launcher-web...")
-s.run_cmd('taskkill /f /im node.exe 2>nul')
-time.sleep(2)
-r = s.run_cmd(r'schtasks /run /tn "ClaudeLauncherWeb"')
-print(f"  Task run RC: {r.status_code}")
-
-# Wait and check if port 3001 is listening
-time.sleep(5)
-r = s.run_cmd('powershell -c "Test-NetConnection -ComputerName localhost -Port 3001 | Select-Object -ExpandProperty TcpTestSucceeded"')
-port_ok = r.std_out.decode().strip()
-print(f"Port 3001 listening: {port_ok}")
+# NOTE: start.bat creation moved to after CLI installs so PATH includes all tools
 
 # ========== STEP 3: Install Dev CLIs ==========
 print("\n=== Step 3: Dev CLIs ===")
@@ -220,18 +186,32 @@ def run_cmd(cmd, label=""):
         print(f"  {label}: {status} - {detail}")
     return r
 
-def install_npm_global(pkg, cmd_name, label):
-    """Install npm global package if not present"""
-    print(f"Installing {label}...")
-    r = run_cmd(f'cmd /c "set PATH={full_path} && {cmd_name} --version"', f"Check {cmd_name}")
-    if r.status_code != 0:
-        run_cmd(f'npm install -g {pkg}', f"npm install {pkg}")
-        run_cmd(f'{cmd_name} --version', label)
-    else:
-        print(f"  {label} already installed")
+# --- Install all npm CLIs in a single batch (much faster than sequential) ---
+npm_packages = {
+    '@anthropic-ai/claude-code': 'claude',
+    '@google/gemini-cli': 'gemini',
+    'cline': 'cline',
+    '@googleworkspace/cli': 'gws',
+    'playwright': 'npx playwright',
+}
 
-# --- Claude Code CLI ---
-install_npm_global('@anthropic-ai/claude-code', 'claude', 'Claude Code CLI')
+# Check which are already installed
+missing = []
+for pkg, cmd in npm_packages.items():
+    check = f'cmd /c "set PATH={full_path} && {cmd} --version"' if not cmd.startswith('npx') else f'cmd /c "set PATH={full_path} && npx playwright --version"'
+    r = s.run_cmd(check)
+    if r.status_code != 0:
+        missing.append(pkg)
+        print(f"  {pkg}: needs install")
+    else:
+        print(f"  {pkg}: already installed ({r.std_out.decode().strip()[:50]})")
+
+if missing:
+    pkg_list = ' '.join(missing)
+    print(f"Installing {len(missing)} npm packages in one batch: {pkg_list}")
+    run_cmd(f'npm install -g {pkg_list}', f"npm install batch ({len(missing)} packages)")
+else:
+    print("  All npm packages already installed")
 
 # --- GitHub CLI (MSI installer, not npm) ---
 print("Installing GitHub CLI...")
@@ -251,11 +231,50 @@ if r.status_code != 0:
     else:
         print("  WARNING: GitHub CLI download failed")
 
-# --- Gemini CLI ---
-install_npm_global('@google/gemini-cli', 'gemini', 'Gemini CLI')
+# --- Playwright chromium browser ---
+print("Installing Playwright chromium...")
+run_cmd('npx playwright install chromium', "Playwright install chromium")
 
-# --- Cline CLI ---
-install_npm_global('cline', 'cline', 'Cline CLI')
+# ========== STEP 4: Start claude-launcher-web with full PATH ==========
+print("\n=== Step 4: Start Launcher ===")
+
+# Re-read system PATH now that all CLIs are installed (gh MSI adds to PATH)
+print("Building start.bat with full PATH (after all CLI installs)...")
+r = s.run_ps('[Environment]::GetEnvironmentVariable("Path","Machine")')
+sys_path = r.std_out.decode().strip()
+npm_bin = r"C:\Users\Administrator\AppData\Roaming\npm"
+gh_dir = r"C:\Program Files\GitHub CLI"
+for extra in [npm_bin, gh_dir]:
+    if extra.lower() not in sys_path.lower():
+        sys_path = sys_path.rstrip(";") + ";" + extra
+
+bat_content = f"@echo off\nset PATH={sys_path};%PATH%\nset PORT=3001\ncd /d C:\\claude-launcher-web\nnode server.js\n"
+escaped_bat = bat_content.replace("'", "''")
+r = s.run_ps(f"Set-Content -Path 'C:\\claude-launcher-web\\start.bat' -Value '{escaped_bat}' -Encoding ASCII")
+print(f"  Write start.bat: RC={r.status_code}")
+
+# Create a scheduled task to auto-start claude-launcher-web
+print("Creating auto-start task...")
+s.run_cmd('schtasks /delete /tn "ClaudeLauncherWeb" /f')
+r = s.run_cmd(
+    'schtasks /create /tn "ClaudeLauncherWeb" /tr '
+    '"cmd /c C:\\claude-launcher-web\\start.bat" '
+    '/sc onstart /ru SYSTEM /rl HIGHEST /f'
+)
+print(f"  Task create RC: {r.status_code}")
+
+# Start it now (kill any existing instance first)
+print("Starting claude-launcher-web...")
+s.run_cmd('taskkill /f /im node.exe 2>nul')
+time.sleep(2)
+r = s.run_cmd(r'schtasks /run /tn "ClaudeLauncherWeb"')
+print(f"  Task run RC: {r.status_code}")
+
+# Wait and check if port 3001 is listening
+time.sleep(5)
+r = s.run_cmd('powershell -c "Test-NetConnection -ComputerName localhost -Port 3001 | Select-Object -ExpandProperty TcpTestSucceeded"')
+port_ok = r.std_out.decode().strip()
+print(f"Port 3001 listening: {port_ok}")
 
 # --- Verify all ---
 print("\nVerifying installations...")
@@ -265,8 +284,10 @@ run_cmd('claude --version', "Claude Code")
 run_cmd('gh --version', "GitHub CLI")
 run_cmd('gemini --version', "Gemini CLI")
 run_cmd('cline --version', "Cline CLI")
+run_cmd('gws --version', "Google Workspace CLI")
+run_cmd('npx playwright --version', "Playwright CLI")
 
 print("\n=== Provisioning complete ===")
 print(f"  VNC: {ip}:5900 (password: hiveclip123)")
 print(f"  Launcher: {ip}:3001")
-print(f"  CLIs: claude, gh, gemini, cline")
+print(f"  CLIs: claude, gh, gemini, cline, gws, playwright")
