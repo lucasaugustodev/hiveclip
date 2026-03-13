@@ -23,7 +23,7 @@ export function Layout() {
                 </Button>
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="right">Boards</TooltipContent>
+            <TooltipContent side="right">Paineis</TooltipContent>
           </Tooltip>
 
           <Separator className="my-1 w-6" />
@@ -39,7 +39,7 @@ export function Layout() {
                   </Button>
                 </Link>
               </TooltipTrigger>
-              <TooltipContent side="right">Settings</TooltipContent>
+              <TooltipContent side="right">Configuracoes</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -48,7 +48,7 @@ export function Layout() {
                   <LogOut className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Logout ({user?.email})</TooltipContent>
+              <TooltipContent side="right">Sair ({user?.email})</TooltipContent>
             </Tooltip>
           </div>
         </div>

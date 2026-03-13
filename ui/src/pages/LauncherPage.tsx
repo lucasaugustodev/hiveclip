@@ -4,11 +4,23 @@ import { fetchBoard } from "../api/boards";
 import { fetchVm } from "../api/vms";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, Maximize2, Minimize2, Terminal } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 
 export function LauncherPage() {
   const { boardId } = useParams<{ boardId: string }>();
   const [fullscreen, setFullscreen] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setToken(session?.access_token ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setToken(session?.access_token ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const { data: board } = useQuery({
     queryKey: ["boards", boardId],
@@ -22,8 +34,6 @@ export function LauncherPage() {
     enabled: !!boardId,
     refetchInterval: 5000,
   });
-
-  const token = localStorage.getItem("hiveclip.token");
 
   // Build the proxied launcher URL
   const launcherUrl = useMemo(() => {
@@ -75,15 +85,15 @@ export function LauncherPage() {
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center space-y-3">
               <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-              <p className="font-medium">VM is still provisioning...</p>
-              <p className="text-xs">Claude Launcher will be available once setup completes</p>
+              <p className="font-medium">A VM ainda esta sendo provisionada...</p>
+              <p className="text-xs">O Claude Launcher estara disponivel quando a configuracao terminar</p>
             </div>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center space-y-2">
               <Terminal className="h-12 w-12 mx-auto opacity-30" />
-              <p>No VM provisioned. Go to the dashboard to provision one first.</p>
+              <p>Nenhuma VM provisionada. Va ao painel para provisionar uma primeiro.</p>
             </div>
           </div>
         )}

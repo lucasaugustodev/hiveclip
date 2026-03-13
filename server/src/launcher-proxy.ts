@@ -3,10 +3,9 @@ import { Router as createRouter } from "express";
 import type { Server as HttpServer } from "node:http";
 import http from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
-import jwt from "jsonwebtoken";
+import { supabase } from "./supabase.js";
 import crypto from "node:crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET || "hiveclip-dev-secret";
 const LAUNCHER_PORT = 3001;
 
 // Session tokens: maps sessionId -> expiry timestamp
@@ -17,20 +16,25 @@ function parseCookies(header: string | undefined): Record<string, string> {
   return Object.fromEntries(header.split(";").map(c => c.trim().split("=").map(s => s.trim())));
 }
 
+async function verifyToken(token: string): Promise<boolean> {
+  const { error } = await supabase.auth.getUser(token);
+  return !error;
+}
+
 /**
  * HTTP reverse proxy: /api/launcher/:ip/* -> http://<ip>:3001/*
  */
 export function createLauncherRouter(): Router {
   const router = createRouter();
 
-  function proxyHandler(req: Request, res: Response) {
+  async function proxyHandler(req: Request, res: Response) {
     const vmIp = req.params.ip as string;
     if (!/^\d+\.\d+\.\d+\.\d+$/.test(vmIp)) {
       res.status(400).json({ error: "Invalid IP" });
       return;
     }
 
-    // Verify JWT from Authorization header, query param, or session cookie
+    // Verify token from Authorization header, query param, or session cookie
     const authHeader = req.headers.authorization;
     const queryToken = req.query.token as string | undefined;
     const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : queryToken || null;
@@ -39,12 +43,9 @@ export function createLauncherRouter(): Router {
 
     let authenticated = false;
 
-    // Check JWT token first
+    // Check Supabase token first
     if (token) {
-      try {
-        jwt.verify(token, JWT_SECRET);
-        authenticated = true;
-      } catch { /* invalid token */ }
+      authenticated = await verifyToken(token);
     }
 
     // Fall back to session cookie
@@ -62,7 +63,7 @@ export function createLauncherRouter(): Router {
       return;
     }
 
-    // If authenticated via JWT, create/refresh a session cookie for sub-requests (CSS/JS/etc)
+    // If authenticated via token, create/refresh a session cookie for sub-requests (CSS/JS/etc)
     if (token) {
       const sid = crypto.randomBytes(24).toString("hex");
       sessions.set(sid, Date.now() + 3600_000); // 1 hour
@@ -149,57 +150,59 @@ export function setupLauncherWsProxy(server: HttpServer) {
     const cookies = cookieHeader ? Object.fromEntries(cookieHeader.split(";").map(c => c.trim().split("=").map(s => s.trim()))) : {};
     const sessionId = cookies["launcher_session"];
 
-    let authenticated = false;
-    if (token) {
-      try { jwt.verify(token, JWT_SECRET); authenticated = true; } catch {}
-    }
-    if (!authenticated && sessionId) {
-      const expiry = sessions.get(sessionId);
-      if (expiry && expiry > Date.now()) authenticated = true;
-    }
+    (async () => {
+      let authenticated = false;
+      if (token) {
+        authenticated = await verifyToken(token);
+      }
+      if (!authenticated && sessionId) {
+        const expiry = sessions.get(sessionId);
+        if (expiry && expiry > Date.now()) authenticated = true;
+      }
 
-    console.log(`[Launcher WS] Auth: token=${!!token ? 'jwt' : 'none'}, session=${!!sessionId}, authenticated=${authenticated}`);
-    if (!authenticated) {
-      console.log(`[Launcher WS] 401 Unauthorized - rejecting`);
-      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-      socket.destroy();
-      return;
-    }
+      console.log(`[Launcher WS] Auth: token=${!!token ? 'supabase' : 'none'}, session=${!!sessionId}, authenticated=${authenticated}`);
+      if (!authenticated) {
+        console.log(`[Launcher WS] 401 Unauthorized - rejecting`);
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        socket.destroy();
+        return;
+      }
 
-    const vmIp = match[1];
+      const vmIp = match[1];
 
-    wss.handleUpgrade(req, socket, head, (clientWs) => {
-      // For inline path, strip /api/launcher/IP prefix and forward the rest
-      // For dedicated path, strip /api/launcher-ws/IP prefix
-      const stripPattern = matchDedicated
-        ? /^\/api\/launcher-ws\/\d+\.\d+\.\d+\.\d+/
-        : /^\/api\/launcher\/\d+\.\d+\.\d+\.\d+/;
-      const vmWsPath = req.url?.replace(stripPattern, "") || "";
-      const vmWsUrl = `ws://${vmIp}:${LAUNCHER_PORT}${vmWsPath}`;
-      console.log(`[Launcher WS] Connecting to VM: ${vmWsUrl}`);
-      const vmWs = new WebSocket(vmWsUrl);
+      wss.handleUpgrade(req, socket, head, (clientWs) => {
+        // For inline path, strip /api/launcher/IP prefix and forward the rest
+        // For dedicated path, strip /api/launcher-ws/IP prefix
+        const stripPattern = matchDedicated
+          ? /^\/api\/launcher-ws\/\d+\.\d+\.\d+\.\d+/
+          : /^\/api\/launcher\/\d+\.\d+\.\d+\.\d+/;
+        const vmWsPath = req.url?.replace(stripPattern, "") || "";
+        const vmWsUrl = `ws://${vmIp}:${LAUNCHER_PORT}${vmWsPath}`;
+        console.log(`[Launcher WS] Connecting to VM: ${vmWsUrl}`);
+        const vmWs = new WebSocket(vmWsUrl);
 
-      vmWs.on("open", () => {
-        console.log(`[Launcher WS] Connected to ${vmIp}:${LAUNCHER_PORT}`);
+        vmWs.on("open", () => {
+          console.log(`[Launcher WS] Connected to ${vmIp}:${LAUNCHER_PORT}`);
+        });
+
+        vmWs.on("message", (data, isBinary) => {
+          if (clientWs.readyState === WebSocket.OPEN) clientWs.send(data, { binary: isBinary });
+        });
+
+        clientWs.on("message", (data, isBinary) => {
+          if (vmWs.readyState === WebSocket.OPEN) vmWs.send(data, { binary: isBinary });
+        });
+
+        vmWs.on("error", (err) => {
+          console.error(`[Launcher WS] VM error:`, err.message);
+          clientWs.close(1011, "Launcher connection error");
+        });
+
+        vmWs.on("close", () => clientWs.close());
+        clientWs.on("close", () => vmWs.close());
+        clientWs.on("error", () => vmWs.close());
       });
-
-      vmWs.on("message", (data, isBinary) => {
-        if (clientWs.readyState === WebSocket.OPEN) clientWs.send(data, { binary: isBinary });
-      });
-
-      clientWs.on("message", (data, isBinary) => {
-        if (vmWs.readyState === WebSocket.OPEN) vmWs.send(data, { binary: isBinary });
-      });
-
-      vmWs.on("error", (err) => {
-        console.error(`[Launcher WS] VM error:`, err.message);
-        clientWs.close(1011, "Launcher connection error");
-      });
-
-      vmWs.on("close", () => clientWs.close());
-      clientWs.on("close", () => vmWs.close());
-      clientWs.on("error", () => vmWs.close());
-    });
+    })();
   });
 
   return wss;

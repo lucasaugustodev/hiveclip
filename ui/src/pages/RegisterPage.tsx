@@ -23,7 +23,7 @@ export function RegisterPage() {
       await register(email, password, displayName || undefined);
       navigate("/");
     } catch (err: any) {
-      setError(err.message || "Registration failed");
+      setError(err.message || "Falha no cadastro");
     } finally {
       setLoading(false);
     }
@@ -34,31 +34,31 @@ export function RegisterPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">HiveClip</CardTitle>
-          <CardDescription>Create a new account</CardDescription>
+          <CardDescription>Crie sua conta</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pb-4">
             {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="space-y-2">
-              <Label htmlFor="name">Display Name</Label>
+              <Label htmlFor="name">Nome</Label>
               <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoFocus />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">E-mail</Label>
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Senha</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Create account"}
+              {loading ? "Criando conta..." : "Criar conta"}
             </Button>
             <p className="text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link to="/login" className="text-primary underline">Sign in</Link>
+              Ja tem uma conta?{" "}
+              <Link to="/login" className="text-primary underline">Entrar</Link>
             </p>
           </CardFooter>
         </form>

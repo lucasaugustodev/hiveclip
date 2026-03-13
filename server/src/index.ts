@@ -1,7 +1,7 @@
 import "dotenv/config";
 import pino from "pino";
 import { createApp } from "./app.js";
-import { startDb, stopDb } from "./db.js";
+import { createDb, stopDb } from "./db.js";
 import { setupVncProxy } from "./vnc-proxy.js";
 import { setupLauncherWsProxy } from "./launcher-proxy.js";
 
@@ -15,9 +15,12 @@ const logger = pino({
 const PORT = Number(process.env.PORT) || 3100;
 
 async function main() {
-  logger.info("Starting embedded PostgreSQL...");
-  const { db } = await startDb();
-  logger.info("PostgreSQL ready");
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL is required");
+
+  logger.info("Connecting to database...");
+  const { db } = createDb(databaseUrl);
+  logger.info("Database connected");
 
   const app = createApp(logger, db);
 

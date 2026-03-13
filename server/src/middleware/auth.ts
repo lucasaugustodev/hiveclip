@@ -1,12 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import { supabase } from "../supabase.js";
 import { unauthorized } from "./error-handler.js";
-
-const JWT_SECRET = process.env.JWT_SECRET || "hiveclip-dev-secret";
-
-export function signToken(payload: { id: string; email: string; role: string }): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
-}
 
 function extractToken(req: Request): string | null {
   const header = req.headers.authorization;
@@ -14,23 +8,25 @@ function extractToken(req: Request): string | null {
   return null;
 }
 
-export function requireAuth(req: Request, _res: Response, next: NextFunction) {
+export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
   const token = extractToken(req);
   if (!token) throw unauthorized("Missing auth token");
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string };
-    req.user = decoded;
-    next();
-  } catch {
-    throw unauthorized("Invalid token");
-  }
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) throw unauthorized("Invalid token");
+
+  req.user = { id: user.id, email: user.email!, role: user.user_metadata?.role || "user" };
+  next();
 }
 
-export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+export async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   const token = extractToken(req);
   if (token) {
     try {
-      req.user = jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string };
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) {
+        req.user = { id: user.id, email: user.email!, role: user.user_metadata?.role || "user" };
+      }
     } catch { /* ignore */ }
   }
   next();

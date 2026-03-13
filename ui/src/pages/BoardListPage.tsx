@@ -33,29 +33,29 @@ export function BoardListPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Your Boards</h1>
-          <p className="text-muted-foreground text-sm">Each board runs on a dedicated Windows VM</p>
+          <h1 className="text-2xl font-bold">Seus Boards</h1>
+          <p className="text-muted-foreground text-sm">Cada board roda em uma VM Windows dedicada</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" />New Board</Button>
+            <Button><Plus className="mr-2 h-4 w-4" />Novo Board</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Board</DialogTitle>
+              <DialogTitle>Criar Board</DialogTitle>
             </DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="board-name">Name</Label>
+                <Label htmlFor="board-name">Nome</Label>
                 <Input id="board-name" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="board-desc">Description</Label>
+                <Label htmlFor="board-desc">Descricao</Label>
                 <Input id="board-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={mutation.isPending}>
-                  {mutation.isPending ? "Creating..." : "Create Board"}
+                  {mutation.isPending ? "Criando..." : "Criar Board"}
                 </Button>
               </DialogFooter>
             </form>
@@ -72,7 +72,7 @@ export function BoardListPage() {
       ) : boards?.length === 0 ? (
         <Card className="p-12 text-center">
           <Hexagon className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">No boards yet. Create your first one.</p>
+          <p className="text-muted-foreground">Nenhum board ainda. Crie o primeiro.</p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -91,7 +91,7 @@ export function BoardListPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  Prefix: {board.issuePrefix} &middot; Created {new Date(board.createdAt).toLocaleDateString()}
+                  Prefixo: {board.issuePrefix} &middot; Criado em {new Date(board.createdAt).toLocaleDateString("pt-BR")}
                 </p>
               </CardContent>
             </Card>
